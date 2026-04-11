@@ -175,6 +175,21 @@ class ProductionValidationSuite:
             ),
             live_optimization=self._config.live_optimization,
             monitoring=monitoring,
+            topstepx=self._config.topstepx.__class__(
+                api_base_url=self._config.topstepx.api_base_url,
+                user_hub_url=self._config.topstepx.user_hub_url,
+                market_hub_url=self._config.topstepx.market_hub_url,
+                username=self._config.topstepx.username,
+                api_key=self._config.topstepx.api_key,
+                account_id=self._config.topstepx.account_id,
+                account_name=self._config.topstepx.account_name,
+                live=self._config.topstepx.live,
+                order_tag_prefix=self._config.topstepx.order_tag_prefix,
+                prefer_micro_contracts=self._config.topstepx.prefer_micro_contracts,
+                symbol_aliases=dict(self._config.topstepx.symbol_aliases),
+                request_timeout_seconds=self._config.topstepx.request_timeout_seconds,
+                validate_token_on_connect=self._config.topstepx.validate_token_on_connect,
+            ),
         )
 
     def _run_symbol_replay(

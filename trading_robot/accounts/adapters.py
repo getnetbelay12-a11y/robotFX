@@ -6,8 +6,9 @@ from abc import ABC, abstractmethod
 from decimal import Decimal
 
 from trading_robot.accounts.models import AccountExecutionResult, ManagedAccount, MasterTradeSignal
+from trading_robot.execution.topstepx import TopstepXExecutionClient
 from trading_robot.execution.interfaces import ExecutionClient
-from trading_robot.types.enums import BrokerType, OrderType
+from trading_robot.types.enums import BrokerType, OrderStatus, OrderType
 from trading_robot.types.models import OrderRequest
 
 
@@ -54,17 +55,44 @@ class MT5Adapter(ExecutionAdapter):
 
 
 class TopstepAdapter(ExecutionAdapter):
-    """Abstract placeholder adapter for Topstep-style futures execution."""
+    """Topstep-style futures adapter backed by TopstepXExecutionClient."""
 
     broker_type = BrokerType.TOPSTEPX
 
-    def execute(self, account: ManagedAccount, signal: MasterTradeSignal, volume: Decimal) -> AccountExecutionResult:
-        """Accepts the same signal format but does not call a live API yet."""
+    def __init__(self, client: TopstepXExecutionClient | None = None) -> None:
+        self._client = client
 
+    def execute(self, account: ManagedAccount, signal: MasterTradeSignal, volume: Decimal) -> AccountExecutionResult:
+        """Execute on TopstepX when a live client is configured."""
+
+        if self._client is None:
+            account.active = False
+            return AccountExecutionResult(
+                account_id=account.account_id,
+                success=False,
+                error_message="Topstep adapter is not configured with a TopstepXExecutionClient",
+                risk_used=account.equity * signal.risk_pct,
+            )
+
+        request = OrderRequest(
+            symbol=signal.symbol,
+            side=signal.direction,
+            order_type=OrderType.MARKET,
+            volume=volume,
+            stop_loss=signal.stop_loss,
+            take_profit=signal.take_profit,
+            price=signal.entry,
+            comment=signal.strategy_type,
+            metadata={"account_id": account.account_id, "signal_id": signal.signal_id},
+        )
+        result = self._client.open_trade(request)
+        success = result.status in {OrderStatus.ACCEPTED, OrderStatus.FILLED, OrderStatus.PARTIALLY_FILLED}
+        if not success:
+            account.active = False
         return AccountExecutionResult(
             account_id=account.account_id,
-            success=False,
-            error_message="Topstep adapter is a placeholder; futures execution API not implemented",
+            success=success,
+            ticket=result.order_id,
+            error_message=result.message,
             risk_used=account.equity * signal.risk_pct,
         )
-

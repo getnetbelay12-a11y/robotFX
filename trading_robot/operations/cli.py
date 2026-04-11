@@ -8,12 +8,12 @@ from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
-from trading_robot.config import ProductionConfig, StrategyConfig, SystemConfig
+from trading_robot.config import BrokerConfig, ProductionConfig, StrategyConfig, SystemConfig, TopstepXConfig
 from trading_robot.operations.readiness import LiveReadinessChecker
 from trading_robot.operations.validation import DEFAULT_SYMBOL_SPECS, ProductionValidationSuite
 from trading_robot.backtesting import StrategyReplayBacktestEngine, aggregate_bars
 from trading_robot.research.data_pipeline import HistoricalDataLoader
-from trading_robot.types import Bar, Timeframe
+from trading_robot.types import Bar, BrokerType, Timeframe
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -28,6 +28,11 @@ def build_parser() -> argparse.ArgumentParser:
     readiness.add_argument("--live-enabled", action="store_true")
     readiness.add_argument("--telegram-bot-token", default=None)
     readiness.add_argument("--telegram-chat-id", default=None)
+    readiness.add_argument("--broker-type", choices=[broker.value for broker in BrokerType], default=BrokerType.MT5.value)
+    readiness.add_argument("--topstepx-username", default=None)
+    readiness.add_argument("--topstepx-api-key", default=None)
+    readiness.add_argument("--topstepx-account-id", type=int, default=None)
+    readiness.add_argument("--topstepx-account-name", default=None)
 
     replay = subparsers.add_parser("run-replay", help="Run strategy-accurate replay on local historical data.")
     replay.add_argument("--symbol", required=True)
@@ -50,6 +55,11 @@ def build_parser() -> argparse.ArgumentParser:
     suite.add_argument("--live-enabled", action="store_true")
     suite.add_argument("--telegram-bot-token", default=None)
     suite.add_argument("--telegram-chat-id", default=None)
+    suite.add_argument("--broker-type", choices=[broker.value for broker in BrokerType], default=BrokerType.MT5.value)
+    suite.add_argument("--topstepx-username", default=None)
+    suite.add_argument("--topstepx-api-key", default=None)
+    suite.add_argument("--topstepx-account-id", type=int, default=None)
+    suite.add_argument("--topstepx-account-name", default=None)
     return parser
 
 
@@ -57,8 +67,15 @@ def main() -> int:
     args = build_parser().parse_args()
     if args.command == "check-live-readiness":
         config = SystemConfig(
+            broker=BrokerConfig(broker_type=BrokerType(args.broker_type)),
             strategy=StrategyConfig(symbols=tuple(symbol.upper() for symbol in args.symbols)),
             production=ProductionConfig(live_trading_enabled=args.live_enabled),
+            topstepx=TopstepXConfig(
+                username=args.topstepx_username,
+                api_key=args.topstepx_api_key,
+                account_id=args.topstepx_account_id,
+                account_name=args.topstepx_account_name,
+            ),
         )
         if args.telegram_bot_token is not None or args.telegram_chat_id is not None:
             config = SystemConfig(
@@ -170,8 +187,15 @@ def main() -> int:
     if args.command == "run-production-suite":
         suite = ProductionValidationSuite(
             SystemConfig(
+                broker=BrokerConfig(broker_type=BrokerType(args.broker_type)),
                 strategy=StrategyConfig(minimum_setup_score=7),
                 production=ProductionConfig(live_trading_enabled=args.live_enabled),
+                topstepx=TopstepXConfig(
+                    username=args.topstepx_username,
+                    api_key=args.topstepx_api_key,
+                    account_id=args.topstepx_account_id,
+                    account_name=args.topstepx_account_name,
+                ),
             )
         )
         report = suite.run(

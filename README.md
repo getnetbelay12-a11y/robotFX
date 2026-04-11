@@ -1,6 +1,6 @@
 # Professional Trading Robot
 
-Phase 12 is a production-style scaffold for a symbol-aware trading robot. It prepares the project for MetaTrader 5 execution, future Exness deployment on MT5, a later TopstepX/futures adapter, strict risk management, adaptive risk control, live performance optimization, news/session filtering, setup scoring, strategy execution, multi-account copying, research, optimization, and backtesting.
+Phase 12 is a production-style scaffold for a symbol-aware trading robot. It prepares the project for MetaTrader 5 execution, future Exness deployment on MT5, a TopstepX/ProjectX futures adapter, strict risk management, adaptive risk control, live performance optimization, news/session filtering, setup scoring, strategy execution, multi-account copying, research, optimization, and backtesting.
 
 This phase implements broker-neutral risk sizing, post-entry trade management, market-state intelligence, a final session/news/prop permission engine, a 0-10 setup scoring and trade selection engine, two entry strategies, an MT5 Expert Advisor execution engine, deterministic backtesting plus optimization tooling, a multi-account cross-platform execution system, lightweight AI-style risk adaptation, production deployment hardening, and a live performance optimization system.
 
@@ -21,7 +21,7 @@ trading_robot/
   trade_management/    TradeManager for partials, breakeven, and trailing stops
   execution/           ExecutionRouter plus broker adapter interfaces
     mt5/               MetaTrader 5 Python-side placeholder adapter
-    topstepx/          Future TopstepX/futures adapter
+    topstepx/          TopstepX/ProjectX futures adapter
   strategy/            StrategyEngine orchestration layer
   journal/             Logger and future audit journal
   backtesting/         BacktestEngine, OptimizationEngine, reporting, and stats
@@ -102,7 +102,20 @@ Execution is isolated behind `ExecutionClient`.
 
 `MT5ExecutionClient` is the placeholder for MetaTrader 5 native order execution and future Exness MT5 deployment. MT5 SDK-specific code should stay inside `trading_robot/execution/mt5/`.
 
-`TopstepXExecutionClient` is the placeholder for a future TopstepX/futures adapter. Authentication, contract mapping, futures-specific rules, and REST/WebSocket routing should stay inside `trading_robot/execution/topstepx/`.
+`TopstepXExecutionClient` now implements the official ProjectX Gateway REST flow for:
+
+- `Auth/loginKey`
+- account discovery
+- contract search
+- order placement
+- full close / partial close
+- order modification / cancellation
+
+The adapter is still conservative:
+
+- credentials must be injected locally
+- account selection must be explicit for live use
+- realtime SignalR hubs are configured but not yet consumed in the Python client
 
 The strategy, risk, scoring, and trade-management modules should never import broker SDKs directly.
 
@@ -446,7 +459,7 @@ Phase 9 adds `trading_robot/accounts/` for cross-platform account fanout:
 - `MasterSignalEngine` converts `TradeSignal` into one shared signal shape: symbol, direction, entry, SL, TP, and risk percent.
 - `AccountManager` tracks account ID, broker type, balance/equity, risk allocation, active/paused status, daily P&L, trade count, loss streak, cooldown, and consistency P&L.
 - `MT5Adapter` sends normalized signals through the broker-neutral `ExecutionClient`.
-- `TopstepAdapter` is a futures/Topstep-style placeholder that accepts the same signal format.
+- `TopstepAdapter` can execute through `TopstepXExecutionClient` when configured, or fail closed when no live client is supplied.
 - `TradeCopier` sends each signal to all active accounts, adjusts volume per account, blocks duplicates, and isolates failures by disabling only the failed account.
 
 Per-account protection:
@@ -809,12 +822,12 @@ Phase 18: Research and Backtesting Expansion
 - Add parameter sweeps and report generation
 - Compare live and backtest behavior through shared interfaces
 
-Phase 19: TopstepX Adapter
+Phase 19: TopstepX Expansion
 
-- Implement `TopstepXExecutionClient`
-- Add futures contract metadata mapping
-- Add TopstepX account/risk rules
-- Add separate integration tests for futures execution
+- Add SignalR user/market stream consumption
+- Add contract rollover handling
+- Add futures-specific position synchronization
+- Add separate sim/live environment validation
 
 ## Operational Validation
 
@@ -854,6 +867,34 @@ This writes:
 - per-symbol bounded replay artifacts such as `runtime/production/replay_validation_xauusd.json`
 
 Use this report as the final code-side handoff before Windows MT5 Strategy Tester and demo validation.
+
+## TopstepX Setup
+
+The Python side now supports ProjectX/TopstepX REST execution. Before using it, keep the configuration local and out of git.
+
+Readiness check:
+
+```bash
+python3 -m trading_robot.operations.cli check-live-readiness \
+  --broker-type topstepx \
+  --topstepx-username "<username>" \
+  --topstepx-api-key "<api-key>" \
+  --topstepx-account-name "<account-name>"
+```
+
+Important details:
+
+- use the official ProjectX Gateway credentials for your TopstepX environment
+- map symbols to futures families through `TopstepXConfig.symbol_aliases`
+- the default aliases prefer micro contracts:
+  - `NAS100 -> MNQ`
+  - `US30 -> MYM`
+  - `XAUUSD -> MGC`
+  - `EURUSD -> M6E`
+  - `BTCUSD -> MBT`
+- keep live trading disabled until account selection and order routing are verified in sim
+
+The REST adapter lives in `trading_robot/execution/topstepx/topstepx_client.py`.
 
 ## Development
 

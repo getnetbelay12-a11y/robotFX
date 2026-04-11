@@ -189,6 +189,41 @@ class BrokerConfig:
 
 
 @dataclass(frozen=True)
+class TopstepXConfig:
+    """ProjectX/TopstepX gateway configuration.
+
+    The TopstepX adapter uses the official ProjectX Gateway API. Credentials
+    should be supplied from the live host, never committed to source control.
+    """
+
+    api_base_url: str = "https://api.thefuturesdesk.projectx.com"
+    user_hub_url: str = "https://rtc.thefuturesdesk.projectx.com/hubs/user"
+    market_hub_url: str = "https://rtc.thefuturesdesk.projectx.com/hubs/market"
+    username: str | None = None
+    api_key: str | None = None
+    account_id: int | None = None
+    account_name: str | None = None
+    live: bool = False
+    order_tag_prefix: str = "robotfx"
+    prefer_micro_contracts: bool = True
+    symbol_aliases: dict[str, tuple[str, ...]] = field(
+        default_factory=lambda: {
+            "NAS100": ("MNQ", "NQ"),
+            "NQ": ("MNQ", "NQ"),
+            "US30": ("MYM", "YM"),
+            "YM": ("MYM", "YM"),
+            "XAUUSD": ("MGC", "GC"),
+            "GOLD": ("MGC", "GC"),
+            "EURUSD": ("M6E", "6E"),
+            "BTCUSD": ("MBT", "BTC"),
+            "BTC": ("MBT", "BTC"),
+        }
+    )
+    request_timeout_seconds: int = 10
+    validate_token_on_connect: bool = True
+
+
+@dataclass(frozen=True)
 class StrategyConfig:
     """Strategy-level configuration.
 
@@ -270,3 +305,4 @@ class SystemConfig:
     production: ProductionConfig = field(default_factory=ProductionConfig)
     live_optimization: LiveOptimizationConfig = field(default_factory=LiveOptimizationConfig)
     monitoring: MonitoringConfig = field(default_factory=MonitoringConfig)
+    topstepx: TopstepXConfig = field(default_factory=TopstepXConfig)

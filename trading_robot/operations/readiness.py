@@ -13,6 +13,7 @@ from pathlib import Path
 
 from trading_robot.config.settings import SystemConfig
 from trading_robot.research.data_readiness import DataReadinessChecker
+from trading_robot.types.enums import BrokerType
 from trading_robot.types.models import SymbolSpec
 
 
@@ -91,6 +92,23 @@ class LiveReadinessChecker:
                 detail="At least one tradable symbol must be configured.",
             )
         )
+        if config.broker.broker_type == BrokerType.TOPSTEPX:
+            items.append(
+                ReadinessItem(
+                    name="topstepx_credentials",
+                    passed=bool(config.topstepx.username and config.topstepx.api_key),
+                    severity="blocker",
+                    detail="TopstepX username and api_key must be configured for live futures execution.",
+                )
+            )
+            items.append(
+                ReadinessItem(
+                    name="topstepx_account_selector",
+                    passed=bool(config.topstepx.account_id is not None or config.topstepx.account_name),
+                    severity="warning",
+                    detail="TopstepX account_id or account_name should be configured to avoid routing to the wrong account.",
+                )
+            )
 
         for symbol in symbols:
             spec = symbol_specs.get(symbol)
