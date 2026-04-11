@@ -1,0 +1,31 @@
+# Python caches and build artifacts
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Runtime artifacts, state, logs, and generated reports
+runtime/
+download/
+*.log
+*.jsonl
+
+# Compiled MT5 binaries and terminal-local files
+*.ex5
+*.mq5.cache
+
+# Secrets and local environment overrides
+.env
+.env.*

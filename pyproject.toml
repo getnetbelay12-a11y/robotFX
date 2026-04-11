@@ -1,0 +1,7 @@
+[project]
+name = "professional-trading-robot"
+version = "0.1.0"
+description = "Phase 1 scaffold for a symbol-aware professional trading robot."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = []
