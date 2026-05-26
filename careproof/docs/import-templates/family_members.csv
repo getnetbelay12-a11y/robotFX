@@ -1,0 +1,3 @@
+clientFirstName,clientLastName,clientDateOfBirth,firstName,lastName,email,phone,relationship,preferredContactMethod
+Mary,Smith,1945-02-10,John,Smith,john.family@example.com,+15551239999,Son,email
+Robert,Lee,1938-06-20,Amy,Lee,amy.family@example.com,+15551238888,Daughter,text

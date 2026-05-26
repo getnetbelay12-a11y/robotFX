@@ -1,0 +1,3 @@
+firstName,lastName,dateOfBirth,addressLine1,city,state,zip,primaryCaregiverEmail,status,riskLevel
+Mary,Smith,1945-02-10,123 Main St,Arlington,VA,22201,sarah.caregiver@example.com,active,normal
+Robert,Lee,1938-06-20,45 Oak Ave,Fairfax,VA,22030,miguel.caregiver@example.com,active,watch
