@@ -100,6 +100,16 @@ import {
   type SystemStatusPayload,
 } from '../lib/api-client';
 import {
+  AuditTimeline,
+  ApprovalBadge,
+  DetailDrawer,
+  MetricCard,
+  ModuleDashboard,
+  NextActionPanel,
+  PageHeader,
+  RiskBadge,
+} from './ui';
+import {
   buildDataExportCsv,
   buildFallbackGoLiveChecklist,
   buildFallbackIntegrations,
@@ -5965,3 +5975,5 @@ export function DataExportScreen() {
     </AppShell>
   );
 }
+
+export { AuditTimeline, ApprovalBadge, DetailDrawer, MetricCard, ModuleDashboard, NextActionPanel, PageHeader, RiskBadge } from './ui';
