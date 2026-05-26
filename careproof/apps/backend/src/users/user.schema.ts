@@ -21,6 +21,9 @@ export class User {
   @Prop({ type: Types.ObjectId, ref: 'Agency', required: true })
   agencyId!: Types.ObjectId;
 
+  @Prop({ type: Types.ObjectId, ref: 'Branch', default: null })
+  branchId?: Types.ObjectId | null;
+
   @Prop({ enum: UserRole, required: true })
   role!: UserRole;
 
@@ -70,3 +73,4 @@ export const UserSchema = SchemaFactory.createForClass(User);
 UserSchema.index({ agencyId: 1, email: 1 }, { unique: true });
 UserSchema.index({ agencyId: 1, role: 1, status: 1 });
 UserSchema.index({ agencyId: 1, deletedAt: 1, status: 1 });
+UserSchema.index({ agencyId: 1, branchId: 1, role: 1 });
