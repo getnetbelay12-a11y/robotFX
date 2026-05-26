@@ -4903,14 +4903,12 @@ export function NurseApprovalsScreen() {
                 <div><span>Status</span><strong><StatusBadge status={visibleStatus(selected)} /></strong></div>
               </div>
               <AiDisclaimer>AI Draft · Needs Human Review · Not Sent · Not Final</AiDisclaimer>
-              <div className="miniSummaryCard">
-                <strong>Notes submitted</strong>
+              <MetricCard title="Notes submitted">
                 <p>{selected.notesSubmitted}</p>
-              </div>
-              <div className="miniSummaryCard">
-                <strong>Nurse comments</strong>
+              </MetricCard>
+              <MetricCard title="Nurse comments">
                 <p>{selected.nurseComments ?? 'No decision comments yet.'}</p>
-              </div>
+              </MetricCard>
               <div className="inlineActions">
                 <button type="button" className="button primaryButton" onClick={() => { setStatusOverrides((current) => ({ ...current, [selected.id]: 'Approved' })); decideNurseApprovalApi(selected.id, 'approved').catch(() => {}); }}>Approve</button>
                 <button type="button" className="button secondaryButton" onClick={() => { setStatusOverrides((current) => ({ ...current, [selected.id]: 'Changes Requested' })); decideNurseApprovalApi(selected.id, 'needs_clarification').catch(() => {}); }}>Request changes</button>
