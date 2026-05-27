@@ -239,6 +239,9 @@ export async function seedDemoData(connection: Connection) {
     ['caregiver10', 'Samuel', 'Green', 'caregiver10@careproof.demo', UserRole.CAREGIVER],
     ['caregiver11', 'Priya', 'Ross', 'caregiver11@careproof.demo', UserRole.CAREGIVER],
     ['caregiver12', 'Leo', 'Gray', 'caregiver12@careproof.demo', UserRole.CAREGIVER],
+    ['nurse', 'Clara', 'Nurse', 'nurse@careproof.demo', UserRole.NURSE],
+    ['socialworker', 'Marcus', 'Social', 'social@careproof.demo', UserRole.SOCIAL_WORKER],
+    ['intake', 'Aisha', 'Intake', 'intake@careproof.demo', UserRole.INTAKE_AGENT],
     ['family1', 'Emily', 'Johnson', 'family1@careproof.demo', UserRole.FAMILY_MEMBER],
   ];
 
