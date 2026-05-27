@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AiDisclaimer } from '../careproof-ai';
+import { AiDisclaimer } from '../../careproof-ai';
 import {
   AppShell,
   DashboardCard,
@@ -9,10 +9,10 @@ import {
   StatusBadge,
   StatCard,
   consoleLinks,
-} from '../careproof-ui';
-import { expirationRecords } from '../../data/demoCareProofData';
-import { fetchExpirationRecordsApi, updateRenewalStatusApi } from '../../lib/api-client';
-import { useDemoStore } from '../../lib/demoStore';
+} from '../../careproof-ui';
+import { expirationRecords } from '../../../data/demoCareProofData';
+import { fetchExpirationRecordsApi, updateRenewalStatusApi } from '../../../lib/api-client';
+import { useDemoStore } from '../../../lib/demoStore';
 
 export function ExpirationCenterScreen() {
   const { showToast } = useDemoStore();

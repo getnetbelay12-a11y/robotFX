@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AiDisclaimer } from '../careproof-ai';
+import { AiDisclaimer } from '../../careproof-ai';
 import {
   AppShell,
   DashboardCard,
@@ -11,10 +11,10 @@ import {
   StatCard,
   Timeline,
   consoleLinks,
-} from '../careproof-ui';
-import { MetricCard } from '../ui';
-import { caregivers, clients, nurseApprovals, users } from '../../data/demoCareProofData';
-import { decideNurseApprovalApi, fetchNurseApprovalsApi } from '../../lib/api-client';
+} from '../../careproof-ui';
+import { MetricCard } from '../../ui';
+import { caregivers, clients, nurseApprovals, users } from '../../../data/demoCareProofData';
+import { decideNurseApprovalApi, fetchNurseApprovalsApi } from '../../../lib/api-client';
 
 export function NurseApprovalsScreen() {
   const [approvals, setApprovals] = useState(nurseApprovals);

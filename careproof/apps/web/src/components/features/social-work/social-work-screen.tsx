@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AppShell, DataTable, StatusBadge, StatCard, consoleLinks } from '../careproof-ui';
-import { clients, socialWorkCases, users } from '../../data/demoCareProofData';
-import { fetchSocialWorkCasesApi, updateSocialWorkCaseStatusApi } from '../../lib/api-client';
-import { isDateStringToday } from '../../lib/date-utils';
+import { AppShell, DataTable, StatusBadge, StatCard, consoleLinks } from '../../careproof-ui';
+import { clients, socialWorkCases, users } from '../../../data/demoCareProofData';
+import { fetchSocialWorkCasesApi, updateSocialWorkCaseStatusApi } from '../../../lib/api-client';
+import { isDateStringToday } from '../../../lib/date-utils';
 
 export function SocialWorkScreen() {
   const [cases, setCases] = useState(socialWorkCases);

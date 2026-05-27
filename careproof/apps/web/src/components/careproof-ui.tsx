@@ -4822,19 +4822,19 @@ export function NotificationsCenterScreen() {
   );
 }
 
-export { NurseApprovalsScreen } from './operational/nurse-approvals-screen';
+export { NurseApprovalsScreen } from './features/nurse-approvals/nurse-approvals-screen';
 
-export { InspectionCenterScreen } from './operational/inspection-center-screen';
+export { InspectionCenterScreen } from './features/inspection-center/inspection-center-screen';
 
-export { SocialWorkScreen } from './operational/social-work-screen';
+export { SocialWorkScreen } from './features/social-work/social-work-screen';
 
-export { IntakeAgentsScreen } from './operational/intake-agents-screen';
+export { IntakeAgentsScreen } from './features/intake-agents/intake-agents-screen';
 
-export { MedicalAvailabilityScreen } from './operational/medical-availability-screen';
+export { MedicalAvailabilityScreen } from './features/medical-availability/medical-availability-screen';
 
-export { ExpirationCenterScreen } from './operational/expiration-center-screen';
+export { ExpirationCenterScreen } from './features/expiration-center/expiration-center-screen';
 
-export { SystemReadinessScreen } from './operational/system-readiness-screen';
+export { SystemReadinessScreen } from './features/system-readiness/system-readiness-screen';
 
 export function QualityRulesScreen() {
   const { settings, updateAgencySettings } = useDemoStore();

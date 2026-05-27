@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AppShell, DataTable, StatusBadge, StatCard, consoleLinks } from '../careproof-ui';
-import { clients, medicalAvailabilityRecords } from '../../data/demoCareProofData';
-import { fetchMedicalAvailabilityApi, updateMedicalAvailabilityStatusApi } from '../../lib/api-client';
+import { AppShell, DataTable, StatusBadge, StatCard, consoleLinks } from '../../careproof-ui';
+import { clients, medicalAvailabilityRecords } from '../../../data/demoCareProofData';
+import { fetchMedicalAvailabilityApi, updateMedicalAvailabilityStatusApi } from '../../../lib/api-client';
 
 export function MedicalAvailabilityScreen() {
   const [medRecords, setMedRecords] = useState(medicalAvailabilityRecords);

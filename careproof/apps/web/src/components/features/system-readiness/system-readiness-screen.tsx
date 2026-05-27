@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AppShell, DataTable, StatusBadge, StatCard, consoleLinks } from '../careproof-ui';
-import { getSystemStatusApi } from '../../lib/api-client';
+import { AppShell, DataTable, StatusBadge, StatCard, consoleLinks } from '../../careproof-ui';
+import { getSystemStatusApi } from '../../../lib/api-client';
 
 const hardcodedReadiness = [
   ['Authentication hardening', 'Production Blocker', 'Demo role switching exists; production auth/session hardening remains.'],

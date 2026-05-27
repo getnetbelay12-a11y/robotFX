@@ -8,9 +8,9 @@ import {
   StatusBadge,
   StatCard,
   consoleLinks,
-} from '../careproof-ui';
-import { caregivers, clients, inspectionFindings, inspectionRules } from '../../data/demoCareProofData';
-import { fetchInspectionFindingsApi, fetchInspectionRulesApi, updateFindingStatusApi } from '../../lib/api-client';
+} from '../../careproof-ui';
+import { caregivers, clients, inspectionFindings, inspectionRules } from '../../../data/demoCareProofData';
+import { fetchInspectionFindingsApi, fetchInspectionRulesApi, updateFindingStatusApi } from '../../../lib/api-client';
 
 export function InspectionCenterScreen() {
   const [findings, setFindings] = useState(inspectionFindings);

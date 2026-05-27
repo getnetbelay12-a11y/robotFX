@@ -8,9 +8,9 @@ import {
   StatusBadge,
   StatCard,
   consoleLinks,
-} from '../careproof-ui';
-import { branches, intakeRecords, users } from '../../data/demoCareProofData';
-import { fetchIntakeRecordsApi, updateIntakeStageApi } from '../../lib/api-client';
+} from '../../careproof-ui';
+import { branches, intakeRecords, users } from '../../../data/demoCareProofData';
+import { fetchIntakeRecordsApi, updateIntakeStageApi } from '../../../lib/api-client';
 
 const NEXT_BACKEND_STAGE: Record<string, string> = {
   'New Referral': 'assessment',
