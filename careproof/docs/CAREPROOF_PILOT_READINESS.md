@@ -1,127 +1,127 @@
 # CareProof Pilot Readiness
 
-This document is the current technical readiness view for a controlled CareProof pilot. It is intentionally honest: CareProof is demo-ready and has meaningful pilot-grade controls, but it is not production-ready until the operational, security, compliance, and infrastructure gaps below are closed.
+This document is the current pilot-readiness view for CareProof. It is written for a go/no-go decision: what is already strong enough for a controlled pilot, what is demo-ready only, and what still blocks production.
+
+CareProof should be described as demo-ready and controlled-pilot-ready in selected areas. It should not be described as production-ready.
 
 ## 1. Current Verified Status
 
-Current verified checks:
+Latest successful checks in the current repo state:
 
-- `pnpm --filter ./apps/backend test` has passed with MongoDB available.
-- `pnpm --filter ./apps/web test` has passed.
-- `pnpm lint` has passed.
-- `pnpm typecheck` has passed.
-- `pnpm test` has passed with required local services available.
-- `pnpm build` has passed.
+- `pnpm lint`
+- `pnpm typecheck`
+- `pnpm test`
+- `pnpm build`
+- `pnpm --filter ./apps/backend test`
+- `pnpm --filter ./apps/web test`
 
-Current implementation status:
+Verified implementation status:
 
-- DTO mapping fixes are in place for operational modules.
+- DTO mapping fixes are in place for the operational modules.
 - Backend operational modules exist for nurse approvals, inspection findings, social work cases, intake records, medical availability, and expiration records.
-- Backend schema/API/frontend gaps have been closed for the known operational fields audited so far.
-- RBAC, agency scoping, branch scoping, caregiver visit restrictions, and family-safe restrictions have been hardened server-side.
-- Frontend operational screens prefer API data and retain demo fallback behavior only for unavailable or empty API data.
+- RBAC and branch/agency hardening are implemented server-side for the key operational paths.
+- Family-safe access hardening is implemented for family-facing data paths.
+- The web build and tests have passed after the latest UI extraction and schema alignment work.
 
 Backend test requirements:
 
-- Backend Jest tests require a reachable MongoDB instance.
-- Tests that touch MongoDB are not valid unless MongoDB is running and the process can open a local socket.
-
-MongoDB requirement:
-
-- Local backend Jest tests require MongoDB at `127.0.0.1:27017`.
+- Backend Jest tests require MongoDB running at `127.0.0.1:27017`.
+- Sandboxed agents may need approved socket access before backend Jest tests can connect to local MongoDB.
 
 ## 2. Demo-Ready Features
 
-The following are strong enough for a controlled demo using seeded or prepared data:
+The following features are demo-ready with seeded or prepared data:
 
-- Proof-of-care visit flow: visit status, visit proof, checklist completion, notes, timestamps, and audit trail review.
-- Caregiver mobile flow: caregiver-oriented visit execution and proof capture workflow.
-- Family-safe updates: approved family-facing summaries instead of raw internal notes.
-- Incidents: incident visibility and operational review flows.
-- Family concerns: family concern submission and linked social work follow-up.
-- Reports: basic reporting/export surfaces for demo walkthroughs.
-- Nurse approvals: review and approval workflow for clinical/operational items.
-- Inspection center: inspection findings with severity, status, linked client/visit/caregiver context, and branch/agency scoping.
-- Social work: social work case list, linked family concern context, and follow-up date handling.
-- Intake/agents: intake records scoped by branch and agency with intake-agent access boundaries.
-- Medical availability: availability review surface for operational staffing readiness.
-- Expiration/compliance: expiration and compliance review surface for staff/document readiness.
-- System readiness: readiness screen that should not represent CareProof as production-ready.
+- Proof-of-care visit flow: visit proof, checklist status, timestamps, notes, and audit trail review.
+- Caregiver mobile flow: caregiver visit execution and assigned-visit experience.
+- Family-safe updates: family views show approved family-safe content instead of raw internal notes.
+- Incidents: incident review and operational follow-up flows are available for demo.
+- Family concerns: family concern submission and linked follow-up workflows are available.
+- Reports: reporting screens are available for controlled walkthroughs.
+- Nurse approvals: clinical/operational review queue with decision actions.
+- Inspection center: inspection findings with severity, status, linked records, and ownership.
+- Social work: social work cases, linked concern context, and follow-up date handling.
+- Intake / agents: referral pipeline, branch-scoped intake records, and intake-agent workflow.
+- Medical availability: readiness records for staff, supplies, medications, equipment, and coverage.
+- Expiration / compliance: license, certification, care plan, authorization, and compliance expiration tracking.
+- System readiness: readiness view that should remain explicit about demo/pilot state and production blockers.
 
-## 3. Pilot-Ready Features
+## 3. Pilot-Ready Areas
 
-These areas are strong enough for a controlled pilot when the pilot scope is narrow, support is hands-on, and production promises are limited:
+These areas are strong enough for a controlled pilot with a small agency, narrow scope, active support, and clear limits on production promises:
 
-- Server-side access control exists for sensitive operational modules.
-- Agency and branch isolation are enforced by backend filtering, not only frontend hiding.
-- Caregiver access is restricted to assigned visits.
-- Family users are restricted to linked clients and approved family-safe content.
-- Operational DTOs and mappers now match backend response shapes for the known six operational modules.
-- Demo fallback behavior is controlled so live API data is preferred when present.
-- Backend and frontend tests cover mapper behavior, operational schema alignment, RBAC, and isolation boundaries.
-- Local build/test commands have passed in the current repo state when MongoDB is available.
+- Agency/branch scoping: backend queries enforce tenant and branch boundaries for the key operational records.
+- Family-safe visibility controls: family users are restricted to linked clients and approved family-safe content.
+- Caregiver assigned-visit enforcement: caregivers are restricted to visits assigned to them.
+- Operational modules with backend persistence: the six operational modules have backend APIs, schemas, DTO mapping, and frontend API preference over demo fallback.
+- Unauthorized access tests: backend tests cover important role and scope denial cases.
+- Demo-safe AI drafts: AI-assisted content is treated as draft/review-only, not final, sent, or approved.
 
 Pilot constraints:
 
-- Use a small number of trained users.
-- Keep a support engineer available during onboarding and first live workflows.
-- Do not promise automated notifications, disaster recovery, or compliance certification until those systems are verified.
-- Treat AI output as draft-only.
+- Keep the pilot small and supervised.
+- Validate the exact pilot roles, branches, and family links before onboarding real users.
+- Do not promise automated notifications, compliance certification, disaster recovery, or production-grade uptime until the blockers below are closed.
 
 ## 4. Not Production-Ready Yet
 
-These items block production launch:
+The following items block production launch:
 
-- Real auth/session hardening beyond basic JWT auth.
-- JWT revocation and refresh token rotation.
+- Real auth/session hardening beyond current JWT basics.
+- JWT revocation / refresh token rotation.
 - Production MongoDB backup and restore automation.
 - Monitoring and alerting for API health, auth failures, MongoDB connectivity, notification failures, and elevated error rates.
-- Email/SMS provider setup with real credentials, verified sender identity, delivery testing, and failure handling.
-- Privacy, compliance, and legal review for real agency/client data.
-- Deployment hardening, including secrets management, CORS review, host permissions, rate limits, and environment separation.
-- Audit log retention policy and retention/deletion implementation for regulated records.
-- Disaster recovery plan with tested recovery time and recovery point expectations.
-- Penetration/security review covering auth, tenant isolation, family visibility, and operational workflows.
+- Email/SMS provider setup with real credentials, verified delivery, retry behavior, and failure reporting.
+- Privacy/compliance/legal review for live agency, client, caregiver, and family data.
+- Deployment hardening, including secrets management, CORS policy, rate limiting, environment separation, and least-privilege access.
+- Audit log retention policy and implementation.
+- Disaster recovery plan with tested restore time and restore point expectations.
+- Penetration/security review covering auth, tenant isolation, branch isolation, family visibility, and operational workflows.
 
 ## 5. Auth/RBAC Status
 
-- Agency scoping: backend records are filtered by `agencyId` for tenant-owned data.
-- Branch scoping: branch-scoped operational records are filtered by `branchId` where branch isolation applies.
-- Role access: owner/admin, nurse, social worker, intake agent, caregiver, and family access paths have server-side restrictions.
-- Family-safe restrictions: family users should only see approved/sent/family-safe updates for linked clients.
-- Caregiver assigned-visit restrictions: caregivers should only access visits assigned to them.
+- Agency scoping: tenant-owned records are filtered by `agencyId` on the backend.
+- Branch scoping: branch-scoped records are filtered by `branchId` where branch boundaries apply.
+- Role-based access: owner/admin, nurse, social worker, intake agent, caregiver, and family routes/actions have server-side restrictions for key workflows.
+- Caregiver assigned-visit restriction: caregivers should only access visits assigned to them.
+- Family-safe restrictions: family users should only access linked-client content that is approved, sent, or explicitly family-safe.
 
-Remaining risks:
+Known remaining risks:
 
-- Every new backend endpoint still needs explicit role and scope tests. The current hardening does not protect future endpoints automatically.
-- Frontend route guards should be kept aligned with backend authorization, but frontend hiding must never be treated as the security boundary.
-- Session hardening, token revocation, and refresh rotation remain production blockers.
+- New endpoints can still introduce authorization drift unless every new controller action includes role and scope tests.
+- Frontend route guards need to stay aligned with backend rules, but frontend hiding is not a security control.
+- Current auth/session posture is acceptable for controlled pilot testing only; token revocation and refresh rotation remain production blockers.
 
 ## 6. Family-Safe Communication Status
 
 - Internal notes must not be family-visible.
+- Review-only summaries must not be exposed to family users.
+- Only completed, sent, or explicitly family-safe summaries should show in family-facing views.
 - Raw incident detail, clinical review detail, compliance-only findings, staff-only comments, and unrelated client records must remain server-restricted.
-- Only approved, sent, or explicitly family-safe summaries should appear in family-facing views.
-- Family visibility must come from server-approved state, not local optimistic UI state.
 - AI drafts require human review before they can become family-visible.
 
 ## 7. AI Safety Boundaries
 
-AI features must stay inside these boundaries:
+AI features must remain inside these boundaries:
 
 - AI Draft: AI output is draft text only.
-- Needs Human Review: a qualified user must review AI-generated content before use.
+- Needs Human Review: a qualified user must review AI output before use.
 - Not Sent: AI output must not be treated as delivered communication.
 - Not Final: AI output must not be treated as the final clinical, operational, or compliance record.
 - No auto-approval: AI must not approve family updates, nurse approvals, inspections, incidents, or compliance items.
 - No auto-send: AI must not send family communications, email, SMS, or portal updates.
 - No auto-close: AI must not close incidents, family concerns, inspection findings, social work cases, or compliance tasks.
 
-AI must not bypass RBAC, agency scoping, branch scoping, family-safe filtering, or approval workflows.
+AI must not bypass RBAC, agency scoping, branch scoping, caregiver assigned-visit restrictions, family-safe filtering, or approval workflows.
 
-## 8. Test Commands
+## 8. Local Test Requirements
 
-Run the full verification set before claiming readiness:
+- MongoDB must run at `127.0.0.1:27017` for backend Jest tests.
+- `connect EPERM 127.0.0.1:27017` usually means environment or socket access is blocked, not necessarily that application code is broken.
+- Sandboxed agents may need approved socket or network access to connect to local MongoDB.
+- Agents should not claim a test failure is fixed unless the relevant command exits with status `0`.
+
+Run the relevant checks with:
 
 ```bash
 pnpm lint
@@ -131,12 +131,6 @@ pnpm build
 pnpm --filter ./apps/backend test
 pnpm --filter ./apps/web test
 ```
-
-## 9. Local Test Requirements
-
-- MongoDB must be running at `127.0.0.1:27017` for backend Jest tests.
-- Sandboxed agents may need approved socket or network access to connect to local MongoDB.
-- A failure containing `EPERM 127.0.0.1:27017` means the environment blocked local MongoDB socket access. That is not automatically a code failure.
 
 Start MongoDB locally with Homebrew:
 
@@ -151,44 +145,36 @@ mkdir -p ./tmp/mongo-data
 mongod --dbpath ./tmp/mongo-data
 ```
 
-Run backend tests:
+## 9. Pilot Go / No-Go Checklist
 
-```bash
-pnpm --filter ./apps/backend test
-```
-
-## 10. Pilot Go / No-Go Checklist
-
-| Area | Status | Evidence | Required before pilot | Required before production |
+| Area | Current Status | Evidence | Required Before Pilot | Required Before Production |
 | --- | --- | --- | --- | --- |
-| Lint/typecheck/test/build | Ready for controlled pilot | Required commands have passed in the current repo state | Re-run in target environment | CI gating on every release |
-| Backend MongoDB tests | Ready with dependency | Backend Jest tests pass when MongoDB is reachable | MongoDB running at `127.0.0.1:27017` or configured test DB | Dedicated test DB and CI service dependency |
-| Proof-of-care visit flow | Demo-ready / pilot-usable | Visit proof and audit trail surfaces exist | Manual pilot script verification | Load, audit retention, and recovery validation |
-| Caregiver mobile flow | Demo-ready / pilot-usable | Caregiver assigned-visit restrictions exist | Device/browser walkthrough with pilot users | Mobile release, crash monitoring, and offline policy |
-| Family-safe updates | Pilot-usable with controls | Family-safe access hardening and approval state | Confirm no internal notes appear in family views | Privacy/legal review and monitoring |
-| Incidents | Demo-ready | Incident workflows are present | Confirm pilot incident handling procedure | Incident response runbook and retention policy |
-| Family concerns | Pilot-usable | Concern submission and social work linkage exist | Verify family-to-social-work handoff | SLA, escalation, and notification guarantees |
-| Reports | Demo-ready | Reporting surfaces exist | Confirm reports needed by pilot agency | Data accuracy audit and export controls |
-| Nurse approvals | Pilot-usable | Backend module, DTO mapping, priority field, tests | Manual nurse approval verification | Clinical governance review |
-| Inspection center | Pilot-usable | Severity, linked records, and scoped access exist | Verify branch-specific inspection views | Compliance/legal review |
-| Social work | Pilot-usable | Linked concern and follow-up date handling exist | Verify next-follow-up workflow | Formal case management policy |
-| Intake/agents | Pilot-usable | Branch-scoped intake records and access boundaries exist | Verify intake cannot access nurse-only data | Full onboarding controls and audit policy |
-| Medical availability | Demo-ready / pilot-usable | Operational module and DTO mapping exist | Verify live API data in pilot seed | Staffing policy and escalation process |
-| Expiration/compliance | Demo-ready / pilot-usable | Operational module and DTO mapping exist | Verify expiration records by branch/agency | Compliance owner and remediation process |
-| System readiness | Demo-ready | Readiness view exists | Confirm it never says production-ready | Real production readiness automation |
-| Auth/RBAC | Pilot-usable | Server-side RBAC/branch hardening exists | Re-run unauthorized access tests | Session hardening, revocation, rotation, pen test |
-| Agency/branch isolation | Pilot-usable | Backend scoping is enforced | Confirm pilot users by branch | Continuous regression tests and audit logging |
-| AI safety | Draft-only | AI boundaries documented | Keep AI as draft/review-only | Governance, logging, privacy review |
-| Email/SMS | Not production-ready | Provider setup is not fully verified | Exclude from pilot promises or verify manually | Real providers, delivery monitoring, retry policy |
-| Backups/restore | Not production-ready | Documentation exists, automation not proven | Manual non-production restore drill | Automated backups and tested DR plan |
-| Monitoring/alerts | Not production-ready | Gaps documented | Basic owner-monitored health checks | Full alerting and on-call path |
+| Authentication | Pilot-limited | JWT auth exists for protected backend paths | Verify pilot accounts, roles, and session behavior | Harden sessions, add JWT revocation and refresh rotation |
+| RBAC | Pilot-usable | Server-side role restrictions and unauthorized access tests exist | Re-run role denial tests for pilot roles | Security review and CI coverage for every sensitive endpoint |
+| Agency isolation | Pilot-usable | Backend records are scoped by `agencyId` | Verify seeded/live pilot users cannot cross agencies | Ongoing regression tests and audit review |
+| Branch isolation | Pilot-usable | Branch-scoped operational records use `branchId` filtering | Verify same-agency cross-branch denial | Full branch policy review and monitoring |
+| Family-safe communication | Pilot-usable with controls | Family-safe access hardening exists | Confirm no internal/review-only notes appear in family views | Privacy/legal review and communication audit process |
+| Caregiver workflow | Demo-ready / pilot-usable | Assigned-visit restrictions and caregiver flow exist | Manual caregiver walkthrough on pilot data | Mobile release hardening, monitoring, and offline policy |
+| Nurse approvals | Pilot-usable | Backend module, DTO mapping, priority field, and tests exist | Manual nurse approval workflow verification | Clinical governance review and audit retention |
+| Inspection findings | Pilot-usable | Backend module, severity alignment, linked records, and scoped access exist | Verify branch-specific inspection views | Compliance review and remediation process |
+| Social work | Pilot-usable | Linked concern and follow-up date handling exist | Verify family concern to social work handoff | Formal case management policy and SLA |
+| Intake | Pilot-usable | Branch-scoped intake records and intake-agent boundaries exist | Verify intake cannot access nurse-only data | Full onboarding controls and audit policy |
+| Medical availability | Demo-ready / pilot-usable | Backend module and DTO mapping exist | Verify live pilot records display from API | Staffing escalation policy and monitoring |
+| Expiration/compliance | Demo-ready / pilot-usable | Backend module and DTO mapping exist | Verify expiration records by branch/agency | Compliance owner, retention policy, and remediation workflow |
+| AI workflows | Draft-only | AI safety boundaries documented | Keep AI as draft/review-only | Governance, logging, privacy review, and model/provider policy |
+| Notifications | Not production-ready | Notification drafts exist; real providers are not fully verified | Exclude from pilot promises or manually verify scope | Real email/SMS providers, delivery monitoring, retries, and alerting |
+| Backups | Not production-ready | Backup docs/scripts exist, but automation is not proven | Run a non-production restore drill | Automated backup/restore verification and DR targets |
+| Monitoring | Not production-ready | Health/readiness surfaces exist; full alerting is not configured | Assign owner and basic manual monitoring | Production monitoring, alert routing, and incident response |
+| Deployment | Pilot-limited | Builds pass locally | Verify staging environment, secrets, CORS, and API URLs | Harden hosting, secrets, rate limits, permissions, and environment separation |
+| Compliance/legal | Not production-ready | Family-safe rules and audit patterns exist | Define pilot data handling expectations | Privacy/compliance/legal review, retention, deletion, and audit policy |
 
-## 11. Recommended Next Engineering Work
+## 10. Recommended Next Engineering Work
 
-- Finish schema gap audit if anything remains after future backend/frontend changes.
-- Continue splitting `careproof-ui.tsx` to reduce blast radius and review risk.
-- Add frontend route guards if they are not fully wired for every operational role.
-- Improve deployment config for staging/production parity, secrets, CORS, and environment separation.
+- Split `careproof-ui.tsx` into feature files.
+- Add or verify frontend route guards for all operational roles.
+- Improve deployment configuration for staging/production parity, secrets, CORS, and environment separation.
 - Add monitoring and backup automation.
 - Add real notification providers for email and SMS with delivery tracking and failure handling.
 - Create a privacy/compliance checklist for pilot onboarding, family communication, audit retention, and data deletion.
+- Add an audit retention policy.
+- Run the manual pilot demo script end to end with owner, nurse, family, social worker, intake agent, and branch-restricted users.
