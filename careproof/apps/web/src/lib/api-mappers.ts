@@ -185,6 +185,7 @@ export function mapIntakeRecord(raw: BackendIntakeRecord): IntakeRecord {
     referralSource: raw.referralSource,
     assignedAgentId: raw.agentName,
     branchId: raw.branchId ?? '',
+    branchName: raw.branchName,
     stage: INTAKE_STAGE[raw.stage] ?? 'New Referral',
     priority: raw.priority === 'urgent' || raw.priority === 'high' ? 'High' : raw.priority === 'medium' ? 'Medium' : 'Low',
     requiredServices: [],

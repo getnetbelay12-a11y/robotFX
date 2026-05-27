@@ -653,6 +653,7 @@ export interface IntakeRecord {
   referralSource: string;
   assignedAgentId: string;
   branchId: string;
+  branchName?: string;
   stage: IntakeStage;
   priority: 'Low' | 'Medium' | 'High';
   requiredServices: string[];

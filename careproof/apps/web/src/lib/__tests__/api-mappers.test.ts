@@ -329,6 +329,10 @@ describe('mapIntakeRecord', () => {
   it('maps branchId from raw.branchId instead of agencyId', () => {
     expect(mapIntakeRecord(raw).branchId).toBe('branch-1');
   });
+
+  it('maps branchName when backend provides branch display metadata', () => {
+    expect(mapIntakeRecord({ ...raw, branchName: 'Northside Care Team' }).branchName).toBe('Northside Care Team');
+  });
 });
 
 describe('mapMedicalAvailability', () => {

@@ -11,6 +11,9 @@ export class IntakeRecord {
   @Prop({ type: Types.ObjectId, index: true })
   branchId!: Types.ObjectId;
 
+  @Prop()
+  branchName!: string;
+
   @Prop({ required: true })
   clientName!: string;
 

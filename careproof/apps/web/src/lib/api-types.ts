@@ -72,6 +72,7 @@ export type BackendIntakeRecord = {
   _id: string;
   agencyId: string;
   branchId?: string;
+  branchName?: string;
   clientName: string;
   agentName: string;
   stage: 'inquiry' | 'assessment' | 'authorization' | 'onboarding' | 'active';

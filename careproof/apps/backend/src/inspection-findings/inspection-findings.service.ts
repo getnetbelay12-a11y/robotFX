@@ -8,6 +8,30 @@ import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/types';
 import { requirePermission } from '../auth/permissions';
 import { requireBranchScope } from '../auth/scope';
+import { Client, ClientDocument } from '../clients/client.schema';
+import { User, UserDocument } from '../users/user.schema';
+
+export type InspectionFindingResponse = {
+  _id: Types.ObjectId;
+  agencyId: Types.ObjectId;
+  branchId?: Types.ObjectId;
+  ruleId: Types.ObjectId;
+  title: string;
+  severity: string;
+  status: string;
+  clientId?: Types.ObjectId;
+  visitId?: Types.ObjectId;
+  caregiverId?: Types.ObjectId;
+  clientName?: string;
+  caregiverName?: string;
+  description?: string;
+  assignedTo?: string;
+  dueDate?: string;
+  resolvedAt?: Date | null;
+  deletedAt?: Date | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+};
 
 @Injectable()
 export class InspectionFindingsService {
@@ -16,6 +40,10 @@ export class InspectionFindingsService {
     private readonly rulesModel: Model<InspectionRuleDocument>,
     @InjectModel(InspectionFinding.name)
     private readonly findingsModel: Model<InspectionFindingDocument>,
+    @InjectModel(Client.name)
+    private readonly clientsModel: Model<ClientDocument>,
+    @InjectModel(User.name)
+    private readonly usersModel: Model<UserDocument>,
     private readonly auditService: AuditService,
   ) {}
 
@@ -27,7 +55,7 @@ export class InspectionFindingsService {
       .lean();
   }
 
-  async listFindings(actor: AuthUser) {
+  async listFindings(actor: AuthUser): Promise<InspectionFindingResponse[]> {
     requirePermission(actor.role, 'inspection.read');
     const filter: Record<string, unknown> = {
       agencyId: new Types.ObjectId(actor.agencyId),
@@ -36,10 +64,31 @@ export class InspectionFindingsService {
     if (actor.branchId) {
       filter.branchId = new Types.ObjectId(actor.branchId);
     }
-    return this.findingsModel
+    const findings = await this.findingsModel
       .find(filter)
       .sort({ createdAt: -1 })
-      .lean();
+      .lean() as InspectionFindingResponse[];
+
+    const clientIds = Array.from(new Set(findings.map((finding) => finding.clientId?.toString()).filter(Boolean)));
+    const caregiverIds = Array.from(new Set(findings.map((finding) => finding.caregiverId?.toString()).filter(Boolean)));
+
+    const [clients, caregivers] = await Promise.all([
+      clientIds.length
+        ? this.clientsModel.find({ _id: { $in: clientIds.map((id) => new Types.ObjectId(id)) }, agencyId: new Types.ObjectId(actor.agencyId), deletedAt: null }).lean()
+        : [],
+      caregiverIds.length
+        ? this.usersModel.find({ _id: { $in: caregiverIds.map((id) => new Types.ObjectId(id)) }, agencyId: new Types.ObjectId(actor.agencyId), deletedAt: null }).lean()
+        : [],
+    ]);
+
+    const clientNameById = new Map(clients.map((client) => [client._id.toString(), `${client.firstName} ${client.lastName}`]));
+    const caregiverNameById = new Map(caregivers.map((caregiver) => [caregiver._id.toString(), `${caregiver.firstName} ${caregiver.lastName}`]));
+
+    return findings.map((finding) => ({
+      ...finding,
+      clientName: finding.clientId ? clientNameById.get(finding.clientId.toString()) ?? finding.clientName : finding.clientName,
+      caregiverName: finding.caregiverId ? caregiverNameById.get(finding.caregiverId.toString()) ?? finding.caregiverName : finding.caregiverName,
+    }));
   }
 
   async updateFindingStatus(actor: AuthUser, id: string, dto: UpdateFindingStatusDto) {

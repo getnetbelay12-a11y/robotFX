@@ -205,6 +205,8 @@ export async function seedDemoData(connection: Connection) {
   const agencyId = new Types.ObjectId();
   const northsideBranchId = new Types.ObjectId();
   const westviewBranchId = new Types.ObjectId();
+  const northsideBranchName = 'Northside Care Team';
+  const westviewBranchName = 'Westview Home Care Team';
   const passwordHash = await argon2.hash('Password123!');
   const now = new Date();
   const weekStart = daysAgo(now, 6, 0, 0);
@@ -1075,6 +1077,7 @@ export async function seedDemoData(connection: Connection) {
     {
       agencyId,
       branchId: northsideBranchId,
+      branchName: northsideBranchName,
       clientName: 'Harold Jenkins',
       agentName: 'Intake Agent A',
       stage: 'assessment',
@@ -1091,6 +1094,7 @@ export async function seedDemoData(connection: Connection) {
     {
       agencyId,
       branchId: westviewBranchId,
+      branchName: westviewBranchName,
       clientName: 'Sylvia Montgomery',
       agentName: 'Intake Agent B',
       stage: 'authorization',
@@ -1107,6 +1111,7 @@ export async function seedDemoData(connection: Connection) {
     {
       agencyId,
       branchId: northsideBranchId,
+      branchName: northsideBranchName,
       clientName: 'Walter Hughes',
       agentName: 'Intake Agent A',
       stage: 'inquiry',

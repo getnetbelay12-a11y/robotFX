@@ -5,7 +5,7 @@ import { Roles } from '../common/roles.decorator';
 import { CurrentUser } from '../common/current-user.decorator';
 import { AuthUser } from '../auth/types';
 import { UserRole } from '../users/user.schema';
-import { InspectionFindingsService } from './inspection-findings.service';
+import { InspectionFindingResponse, InspectionFindingsService } from './inspection-findings.service';
 import { UpdateFindingStatusDto } from './dto/update-finding-status.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -21,7 +21,7 @@ export class InspectionFindingsController {
 
   @Roles(UserRole.AGENCY_OWNER, UserRole.AGENCY_ADMIN, UserRole.CARE_COORDINATOR, UserRole.NURSE, UserRole.CAREGIVER)
   @Get()
-  listFindings(@CurrentUser() actor: AuthUser) {
+  listFindings(@CurrentUser() actor: AuthUser): Promise<InspectionFindingResponse[]> {
     return this.service.listFindings(actor);
   }
 

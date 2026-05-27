@@ -11,6 +11,10 @@ export class CreateIntakeRecordDto {
   @IsOptional()
   branchId?: string;
 
+  @IsString()
+  @IsOptional()
+  branchName?: string;
+
   @IsIn(['inquiry', 'assessment', 'authorization', 'onboarding', 'active'])
   stage!: string;
 

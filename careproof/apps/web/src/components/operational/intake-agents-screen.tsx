@@ -105,7 +105,7 @@ export function IntakeAgentsScreen() {
             item.prospectName,
             item.referralSource,
             users.find((user) => user.id === item.assignedAgentId)?.name ?? item.assignedAgentId ?? 'Agent',
-            branches.find((branch) => branch.id === item.branchId)?.name ?? '-',
+            item.branchName ?? branches.find((branch) => branch.id === item.branchId)?.name ?? '-',
             item.payerType,
             <StatusBadge key="docs" status={item.documentsStatus} />,
             <StatusBadge key="nurse" status={item.nurseApprovalStatus} />,
