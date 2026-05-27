@@ -31,15 +31,11 @@ import {
   socialWorkCases,
 } from '../data/demoCareProofData';
 import {
-  buildVisitExceptionItems,
   getConcernOverdue,
   getChecklistProgress,
   getFamilyUpdateStatus,
-  getLiveVisitStatus,
   getVisitAlert,
   getVisitDisplayStatus,
-  getVisitRiskLevel,
-  getVisitProgress,
   getVisitStatus,
   isCheckoutMissing,
   isLateVisit,
@@ -69,7 +65,6 @@ import {
   checkOutCanonicalDemoVisitApi,
   cleanupCaregiverNoteApi,
   completeCanonicalDemoTaskApi,
-  generateFamilyUpdateDraftApi,
   generateIncidentTriageApi,
   getGoLiveChecklistApi,
   getIntegrationsApi,
@@ -77,7 +72,6 @@ import {
   loadCanonicalDemoVisitApi,
   saveCanonicalDemoVisitNoteApi,
   skipCanonicalDemoTaskApi,
-  generateVisitSummaryApi,
   generateWeeklyReportDraftApi,
   type GoLiveChecklistPayload,
   type IntegrationCardPayload,
@@ -91,7 +85,6 @@ import {
 } from '../lib/deployment-readiness';
 import type {
   CarePlanTaskDefinition,
-  ExceptionItem,
   FamilyConcern,
   Incident,
   ImportJob,
@@ -754,7 +747,7 @@ export function displayVisitCode(visit: Visit) {
   return code;
 }
 
-function todayVisitsOnly(visits: Visit[]) {
+export function todayVisitsOnly(visits: Visit[]) {
   return visits.filter((visit) => visit.scheduledDay === 'Today');
 }
 
@@ -787,7 +780,7 @@ export function attentionActionLabel(label: string) {
   return labels[label] ?? 'Open work queue';
 }
 
-function exceptionActionLabel(type: string) {
+export function exceptionActionLabel(type: string) {
   const lower = type.toLowerCase();
   if (lower.includes('incident')) return 'Review incident';
   if (lower.includes('concern')) return 'Respond to concern';
@@ -1054,398 +1047,9 @@ export function PricingPageScreen() {
 
 export { ConsoleDashboardScreen } from './features/dashboard/console-dashboard-screen';
 
-export function VisitsScreen() {
-  const { visits, incidents, showToast } = useDemoStore();
-  const [statusFilter, setStatusFilter] = useState(
-    () => (typeof window === 'undefined' ? 'All' : new URLSearchParams(window.location.search).get('status') ?? 'All'),
-  );
-  const [caregiverFilter, setCaregiverFilter] = useState('All');
-  const [clientFilter, setClientFilter] = useState(
-    () => (typeof window === 'undefined' ? 'All' : new URLSearchParams(window.location.search).get('client') ?? 'All'),
-  );
-  const [rangeFilter, setRangeFilter] = useState<'Today' | 'Week'>('Today');
-  const [search, setSearch] = useState('');
+export { VisitsScreen } from './features/visits/visits-screen';
 
-  const filteredVisits = useMemo(() => {
-    return visits.filter((visit) => {
-      const client = getClient(visit.clientId);
-      const caregiver = getCaregiver(visit.caregiverId);
-      const status = getVisitStatus(visit);
-      const inRange = rangeFilter === 'Week' ? true : visit.scheduledDay === 'Today';
-      const statusMatch = statusFilter === 'All' ? true : status === statusFilter;
-      const caregiverMatch = caregiverFilter === 'All' ? true : caregiver?.id === caregiverFilter;
-      const clientMatch = clientFilter === 'All' ? true : client?.id === clientFilter;
-      const text = `${client?.name ?? ''} ${caregiver?.name ?? ''} ${displayVisitCode(visit)}`.toLowerCase();
-      const searchMatch = !search.trim() ? true : text.includes(search.trim().toLowerCase());
-      return inRange && statusMatch && caregiverMatch && clientMatch && searchMatch;
-    });
-  }, [visits, statusFilter, caregiverFilter, clientFilter, rangeFilter, search]);
-  const todayVisits = visits.filter((visit) => visit.scheduledDay === 'Today');
-  const inProgress = todayVisits.filter((visit) => getVisitStatus(visit) === 'In Progress').length;
-  const needsReview = todayVisits.filter((visit) => getVisitStatus(visit) === 'Needs Review' || Boolean(visit.incidentId) || (!visit.careNote && getVisitStatus(visit) === 'Completed')).length;
-  const missingNotes = todayVisits.filter((visit) => !visit.careNote?.text).length;
-
-  return (
-    <AppShell
-      title="Visits"
-      subtitle="Filter by status, caregiver, client, and time range. Open a visit record and act on it."
-      navItems={consoleLinks}
-    >
-      <div className="statsGrid">
-        <StatCard label="Today’s visits" value={todayVisits.length} />
-        <StatCard label="In progress" value={inProgress} tone="info" />
-        <StatCard label="Needs review" value={needsReview} tone="warning" />
-        <StatCard label="Missing notes" value={missingNotes} tone="warning" />
-      </div>
-      <SectionHeader
-        eyebrow="Visit operations"
-        title="Visit board"
-        actions={
-          <div className="filterControlRow">
-            <Link className="button secondaryButton" href="/console/schedule">Create Visit</Link>
-            <select value={rangeFilter} onChange={(event) => setRangeFilter(event.target.value as 'Today' | 'Week')}>
-              <option value="Today">Today</option>
-              <option value="Week">This week</option>
-            </select>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="All">All statuses</option>
-              <option>Scheduled</option>
-              <option>In Progress</option>
-              <option>Completed</option>
-              <option>Late</option>
-              <option>Missed</option>
-              <option>Needs Review</option>
-            </select>
-            <select value={caregiverFilter} onChange={(event) => setCaregiverFilter(event.target.value)}>
-              <option value="All">All caregivers</option>
-              {caregivers.map((caregiver) => (
-                <option key={caregiver.id} value={caregiver.id}>{caregiver.name}</option>
-              ))}
-            </select>
-            <select value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}>
-              <option value="All">All clients</option>
-              {clients.map((client) => (
-                <option key={client.id} value={client.id}>{client.name}</option>
-              ))}
-            </select>
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search visit, client, or caregiver" />
-          </div>
-        }
-      />
-      {filteredVisits.length ? (
-        <DataTable
-          columns={['Visit', 'Client', 'Caregiver', 'Scheduled time', 'Status', 'Check-in', 'Check-out', 'Checklist', 'Incident', 'Family update', 'Action']}
-          rows={filteredVisits.map((visit) => {
-            const client = getClient(visit.clientId);
-            const caregiver = getCaregiver(visit.caregiverId);
-            const incident = visit.incidentId ? incidents.find((item) => item.id === visit.incidentId) : null;
-            return [
-              displayVisitCode(visit),
-              <div key="client" className="tablePrimaryCell"><strong>{client?.name}</strong><span>{client?.address}</span></div>,
-              caregiver?.name ?? '—',
-              visit.scheduledTime,
-              <StatusBadge key="status" status={getVisitStatus(visit)} />,
-              visit.checkInTime ?? '—',
-              visit.checkOutTime ?? '—',
-              getChecklistProgress(visit).label,
-              incident ? incident.type : 'None',
-              getFamilyUpdateStatus(visit),
-              <div key="actions" className="inlineActions">
-                <Link className="textAction" href={`/console/visits/${visit.id}`}>View visit</Link>
-                <button type="button" className="textAction" onClick={() => showToast('Demo reminder recorded for the assigned caregiver.')}>Send Reminder</button>
-              </div>,
-            ];
-          })}
-        />
-      ) : (
-        <EmptyState title="No visits match this filter." text="Try a broader status, client, caregiver, or date selection." />
-      )}
-    </AppShell>
-  );
-}
-
-export function VisitDetailScreen({ visitId }: { visitId: string }) {
-  const { visits, incidents, showToast, approveFamilyUpdate, syncVisitSnapshot } = useDemoStore();
-  const visit = visits.find((item) => item.id === visitId);
-  const [backendVisitId, setBackendVisitId] = useState<string | null>(null);
-  const [visitSummaryDraft, setVisitSummaryDraft] = useState<{ internalSummary: string; familySafeSummary: string; riskFlags: string[]; requiresReview: boolean; label: string } | null>(null);
-  const [familyDraft, setFamilyDraft] = useState<{ familyUpdateDraft: string; requiresApproval: boolean; label: string } | null>(null);
-  const [familyDraftText, setFamilyDraftText] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
-  const visitRef = useRef<Visit | undefined>(visit);
-  const showToastRef = useRef(showToast);
-  const syncVisitSnapshotRef = useRef(syncVisitSnapshot);
-
-  useEffect(() => {
-    visitRef.current = visit;
-    showToastRef.current = showToast;
-    syncVisitSnapshotRef.current = syncVisitSnapshot;
-  }, [showToast, syncVisitSnapshot, visit]);
-
-  useEffect(() => {
-    const currentVisit = visitRef.current;
-    if (!currentVisit || visitId !== 'visit-maria-am') return;
-    let active = true;
-    void loadCanonicalDemoVisitApi(visitId, currentVisit)
-      .then(({ backendVisitId: resolvedId, visitPatch }) => {
-        if (!active) return;
-        setBackendVisitId(resolvedId);
-        syncVisitSnapshotRef.current(visitId, visitPatch);
-      })
-      .catch(() => {
-        if (!active) return;
-        showToastRef.current('Using local demo visit state.');
-      });
-    return () => {
-      active = false;
-    };
-  }, [visitId]);
-
-  if (!visit) {
-    return (
-      <AppShell title="Visit not found" subtitle="The requested visit record is not available." navItems={consoleLinks}>
-        <EmptyState title="Visit not found" text="Open a valid visit from the visits board." />
-      </AppShell>
-    );
-  }
-
-  const client = getClient(visit.clientId);
-  const caregiver = getCaregiver(visit.caregiverId);
-  const incident = visit.incidentId ? incidents.find((item) => item.id === visit.incidentId) : null;
-  const checklistProgress = getChecklistProgress(visit);
-  const noteStatus = visit.careNote?.text ? 'Entered' : 'Missing';
-  const incidentStatus = incident ? incident.status : 'None';
-  const linkedApprovals = nurseApprovals.filter((item) => item.visitId === visit.id || item.clientId === visit.clientId);
-  const linkedFindings = inspectionFindings.filter((item) => item.visitId === visit.id || item.clientId === visit.clientId);
-  const linkedAvailability = medicalAvailabilityRecords.filter((item) => item.visitId === visit.id || item.clientId === visit.clientId);
-  const nurseApprovalStatus: string = linkedApprovals.find((item) => item.blocksFamilyVisibility)?.status ?? linkedApprovals[0]?.status ?? 'Not Required';
-  const medicalAvailabilityStatus: string = linkedAvailability.find((item) => item.blocksVisit)?.status ?? linkedAvailability[0]?.status ?? 'Available';
-
-  return (
-    <AppShell
-      title={`${client?.name} · ${displayVisitCode(visit)}`}
-      subtitle="Schedule, check-in, checklist, note, incident, family update, and audit history in one record."
-      navItems={consoleLinks}
-    >
-      <div className="detailHero">
-        <div className="detailHeroInfo">
-          <p className="sectionEyebrow">Visit detail</p>
-          <h2>{client?.name}</h2>
-          <p>{caregiver?.name} · {visit.scheduledTime}</p>
-          <p className="mutedMeta">One operating record for schedule, caregiver proof, checklist, care note, family-safe update, and audit history.</p>
-        </div>
-        <div className="detailHeroActions">
-          <StatusBadge status={getVisitStatus(visit)} />
-          <Link className="button secondaryButton" href={`/caregiver/visit/${visit.id}`}>Open Caregiver Workflow</Link>
-          <Link className="button ghostButton" href="/family/updates">View Family Update</Link>
-        </div>
-      </div>
-
-      <div className="statsGrid proofStatsGrid">
-        <StatCard label="Visit status" value={getVisitStatus(visit)} tone={getVisitStatus(visit) === 'Completed' ? 'positive' : 'info'} />
-        <StatCard label="Checklist" value={checklistProgress.label} tone={checklistProgress.completed === checklistProgress.total ? 'positive' : 'warning'} />
-        <StatCard label="Care note" value={noteStatus} tone={noteStatus === 'Entered' ? 'positive' : 'warning'} />
-        <StatCard label="Family update" value={getFamilyUpdateStatus(visit)} tone={getFamilyUpdateStatus(visit) === 'Sent' ? 'positive' : 'neutral'} />
-        <StatCard label="Incident" value={incidentStatus} tone={incident ? 'warning' : 'neutral'} />
-        <StatCard label="Nurse approval" value={nurseApprovalStatus} tone={nurseApprovalStatus === 'Approved' ? 'positive' : nurseApprovalStatus === 'Not Required' ? 'neutral' : 'warning'} href="/console/nurse-approvals" />
-        <StatCard label="Medical readiness" value={medicalAvailabilityStatus} tone={medicalAvailabilityStatus === 'Available' ? 'positive' : 'warning'} href="/console/medical-availability" />
-      </div>
-
-      <div className="detailMetaGrid">
-        <DashboardCard title="Visit proof summary">
-          <div className="detailFactGrid">
-            <div><span>Client name</span><strong>{client?.name}</strong></div>
-            <div><span>Caregiver name</span><strong>{caregiver?.name}</strong></div>
-            <div><span>Scheduled</span><strong>{visit.scheduledTime}</strong></div>
-            <div><span>Check-in / check-out</span><strong>{visit.checkInTime ?? '—'} / {visit.checkOutTime ?? '—'}</strong></div>
-            <div><span>Checklist proof</span><strong>{checklistProgress.label} completed</strong></div>
-            <div><span>Audit events</span><strong>{visit.auditLogs.length} recorded</strong></div>
-          </div>
-        </DashboardCard>
-        <DashboardCard title="Operational trust links">
-          <div className="stackGrid">
-            <div className="miniSummaryCard">
-              <div className="aiRiskSignalTop"><strong>Nurse approval</strong><StatusBadge status={nurseApprovalStatus} /></div>
-              <p>{linkedApprovals[0]?.notesSubmitted ?? 'No nurse approval is currently required for this visit.'}</p>
-              <Link className="textAction" href="/console/nurse-approvals">Open approval queue</Link>
-            </div>
-            <div className="miniSummaryCard">
-              <div className="aiRiskSignalTop"><strong>Inspection findings</strong><StatusBadge status={linkedFindings.length ? linkedFindings[0].severity : 'Info'} /></div>
-              <p>{linkedFindings[0]?.recommendedAction ?? 'No open inspection finding is linked to this visit.'}</p>
-              <Link className="textAction" href="/console/inspection-center">Open inspection center</Link>
-            </div>
-            <div className="miniSummaryCard">
-              <div className="aiRiskSignalTop"><strong>Medical availability</strong><StatusBadge status={medicalAvailabilityStatus} /></div>
-              <p>{linkedAvailability[0]?.nextAction ?? 'Medical availability is currently clear for the visit.'}</p>
-              <Link className="textAction" href="/console/medical-availability">Open readiness checklist</Link>
-            </div>
-          </div>
-        </DashboardCard>
-        <DashboardCard title="Family update status">
-          <div className="detailFactGrid">
-            <div><span>Status</span><strong>{getFamilyUpdateStatus(visit)}</strong></div>
-            <div><span>Family-safe summary</span><strong>{visit.careNote?.approvedSummary ?? 'Pending coordinator approval'}</strong></div>
-            <div><span>Time sent</span><strong>{getFamilyUpdateStatus(visit) === 'Sent' ? '10:06 AM' : 'Pending'}</strong></div>
-          </div>
-          <p className="fieldHint">Internal notes stay separate. Families only see approved summaries and sent reports.</p>
-        </DashboardCard>
-      </div>
-
-      <div className="dashboardSplit">
-        <DashboardCard title="Visit timeline">
-          <Timeline items={visit.events} />
-        </DashboardCard>
-        <DashboardCard title="Audit trail">
-          <Timeline items={visit.auditLogs.map((item) => ({ label: item.action, time: item.time, actor: item.actor }))} />
-        </DashboardCard>
-      </div>
-
-      <div className="dashboardSplit">
-        <DashboardCard title="Checklist">
-          <div className="checklistGrid">
-            {visit.checklist.map((item) => (
-              <div key={item.id} className="checklistRow">
-                <strong>{item.label}</strong>
-                <StatusBadge status={item.completed ? 'Completed' : 'Scheduled'} />
-              </div>
-            ))}
-          </div>
-        </DashboardCard>
-        <DashboardCard title="Care note">
-          <p className="longformBlock">
-            {visit.careNote?.text ?? 'No care note entered yet. This should be reviewed before finalizing the visit.'}
-          </p>
-        </DashboardCard>
-      </div>
-
-      <div className="dashboardSplit">
-        <DashboardCard title="Incident follow-up">
-          {incident ? (
-            <div className="longformStack">
-              <StatusBadge status={incident.status} />
-              <strong>{incident.type}</strong>
-              <p>{incident.description}</p>
-              <p><strong>Follow-up:</strong> {incident.followUpAction}</p>
-              <p><strong>Family communication:</strong> {incident.familyCommunicationStatus}</p>
-            </div>
-          ) : (
-            <EmptyState title="None reported" text="No incident has been reported for this visit." />
-          )}
-        </DashboardCard>
-        <DashboardCard title="Visit actions">
-          <div className="actionStack">
-            <button
-              type="button"
-              className="button secondaryButton"
-              onClick={() => showToast(backendVisitId ? 'Maria Johnson visit is connected to the backend pilot flow.' : 'Visit proof reviewed in demo mode.')}
-            >
-              Review Visit Proof
-            </button>
-            <button type="button" className="button ghostButton" onClick={() => showToast('Follow-up marker saved in demo mode.')}>
-              Mark Follow-up Needed
-            </button>
-          </div>
-        </DashboardCard>
-      </div>
-
-      <AiPanel title="AI Assistance">
-        <div className="stackGrid">
-          <AiDraftCard
-            title="Visit Summary Draft"
-            actions={
-              <AiActionButton
-                label="Generate Visit Summary"
-                onClick={async () => {
-                  setAiLoading(true);
-                  const result = await generateVisitSummaryApi({
-                    visitId: visit.id,
-                    careNote: visit.careNote?.text ?? 'No care note entered.',
-                    checklist: visit.checklist.map((item) => ({
-                      label: item.label,
-                      required: true,
-                      completed: item.completed,
-                    })),
-                    incidentSeverities: incident ? [incident.severity.toLowerCase()] : [],
-                    visitStatus: getVisitStatus(visit).toLowerCase().replace(/\s+/g, '_'),
-                  });
-                  const draft = result as { internalSummary: string; familySafeSummary: string; riskFlags: string[]; requiresReview: boolean; label: string };
-                  setVisitSummaryDraft(draft);
-                  setAiLoading(false);
-                  showToast(draft.label);
-                }}
-                disabled={aiLoading}
-              />
-            }
-          >
-            {visitSummaryDraft ? (
-              <div className="longformStack">
-                <AiReviewBadge label={visitSummaryDraft.label} />
-                <p><strong>Internal summary:</strong> {visitSummaryDraft.internalSummary}</p>
-                <p><strong>Family-safe summary:</strong> {visitSummaryDraft.familySafeSummary}</p>
-                <p><strong>Requires review:</strong> {visitSummaryDraft.requiresReview ? 'Yes' : 'No'}</p>
-                <p><strong>Risk flags:</strong> {visitSummaryDraft.riskFlags.length ? visitSummaryDraft.riskFlags.join(', ') : 'None'}</p>
-              </div>
-            ) : (
-              <EmptyState title="No draft yet" text="Generate an AI-assisted visit summary for internal review." />
-            )}
-          </AiDraftCard>
-
-          <AiDraftCard
-            title="Family Update Draft"
-            actions={
-              <AiActionButton
-                label="Draft Family Update"
-                onClick={async () => {
-                  const result = await generateFamilyUpdateDraftApi({
-                    visitId: visit.id,
-                    careNote: visit.careNote?.text ?? 'Visit completed and documented.',
-                    checklist: visit.checklist.map((item) => ({
-                      label: item.label,
-                      required: true,
-                      completed: item.completed,
-                    })),
-                    incidentSeverities: incident ? [incident.severity.toLowerCase()] : [],
-                    visitStatus: getVisitStatus(visit).toLowerCase().replace(/\s+/g, '_'),
-                  });
-                  const draft = result as { familyUpdateDraft: string; requiresApproval: boolean; label: string };
-                  setFamilyDraft(draft);
-                  setFamilyDraftText(draft.familyUpdateDraft);
-                  showToast(draft.label);
-                }}
-              />
-            }
-          >
-            {familyDraft ? (
-              <div className="longformStack">
-                <AiReviewBadge label="Human review required" />
-                <EditableAiDraft value={familyDraftText} onChange={setFamilyDraftText} rows={5} />
-                <AiDisclaimer>Family-facing text stays separate from internal notes and must be approved before sharing.</AiDisclaimer>
-                <div className="inlineActions">
-                  <AiActionButton label="Copy Draft" onClick={() => {
-                    void navigator.clipboard?.writeText(familyDraftText);
-                    showToast('Family update draft copied.');
-                  }} tone="ghost" />
-                  <AiActionButton label="Save as Draft" onClick={() => showToast('Family update draft saved for coordinator review.')} />
-                  <AiActionButton label="Approve for Family" tone="primary" onClick={() => approveFamilyUpdate(visit.id, familyDraftText)} />
-                </div>
-              </div>
-            ) : (
-              <EmptyState title="No family draft yet" text="Generate a family-safe summary before approving anything for the portal." />
-            )}
-          </AiDraftCard>
-
-          <AiDraftCard title="Risk Flags" eyebrow="Internal only">
-            {visitSummaryDraft?.riskFlags?.length ? (
-              <AiSuggestionList items={visitSummaryDraft.riskFlags} />
-            ) : (
-              <p>No current AI risk flags. Incident review and checklist status still apply.</p>
-            )}
-          </AiDraftCard>
-        </div>
-      </AiPanel>
-    </AppShell>
-  );
-}
+export { VisitDetailScreen } from './features/visits/visit-detail-screen';
 
 export function ClientsScreen() {
   const { visits } = useDemoStore();
@@ -3757,168 +3361,7 @@ export function FamilyProfileScreen() {
   );
 }
 
-export function OperationsScreen() {
-  const { filteredVisits, filteredIncidents, filteredFamilyConcerns, coordinatorChecklist, toggleCoordinatorChecklistItem, showToast } = useDemoStore();
-  const { getClient, getCaregiver } = useReferenceData();
-  const todayVisits = todayVisitsOnly(filteredVisits);
-  const exceptionItems = buildVisitExceptionItems({
-    visits: todayVisits,
-    incidents: filteredIncidents,
-    concerns: filteredFamilyConcerns,
-  }).sort((a, b) => {
-    const order: Record<ExceptionItem['severity'], number> = { Critical: 0, High: 1, Medium: 2, Low: 3 };
-    return order[a.severity] - order[b.severity];
-  });
-  const overview = [
-    ['Scheduled today', todayVisits.length, 'neutral'],
-    ['In progress', todayVisits.filter((visit) => getLiveVisitStatus(visit) === 'In Progress').length, 'info'],
-    ['Completed', todayVisits.filter((visit) => getLiveVisitStatus(visit) === 'Completed').length, 'positive'],
-    ['Late', todayVisits.filter((visit) => getLiveVisitStatus(visit) === 'Late').length, 'warning'],
-    ['Missed', todayVisits.filter((visit) => getLiveVisitStatus(visit) === 'Missed').length, 'danger'],
-    ['Needs review', todayVisits.filter((visit) => getLiveVisitStatus(visit) === 'Needs Review').length, 'warning'],
-    ['Open incidents', filteredIncidents.filter((incident) => !['Resolved', 'Closed'].includes(incident.status)).length, 'warning'],
-    ['Open family concerns', filteredFamilyConcerns.filter((concern) => !['Resolved', 'Closed'].includes(concern.status)).length, 'warning'],
-  ] as const;
-  const columns: Array<{ label: string; items: Visit[] }> = [
-    { label: 'Upcoming', items: todayVisits.filter((visit) => ['Upcoming', 'Due Soon'].includes(getVisitDisplayStatus(visit))) },
-    { label: 'In Progress', items: todayVisits.filter((visit) => getVisitDisplayStatus(visit) === 'In Progress') },
-    { label: 'Completed', items: todayVisits.filter((visit) => getVisitDisplayStatus(visit) === 'Completed') },
-    { label: 'Needs Attention', items: todayVisits.filter((visit) => ['Late', 'Missed', 'Checkout Missing', 'Needs Review'].includes(getVisitDisplayStatus(visit))) },
-  ];
-  const topExceptions = exceptionItems.slice(0, 3);
-
-  return (
-    <AppShell title="Operations command center" subtitle="Open this view first each morning to see the day, the exceptions, and the next coordinator actions." navItems={consoleLinks}>
-      <SectionHeader eyebrow="Daily operations" title="Today overview" text="Service reliability, live visit status, and exception ownership in one screen." />
-      <div className="statsGrid">
-        {overview.map(([label, value, tone]) => (
-          <StatCard key={label} label={label} value={value} tone={tone as 'neutral' | 'positive' | 'warning' | 'danger' | 'info'} />
-        ))}
-      </div>
-
-      <DashboardCard title="Start here">
-        <div className="priorityStrip">
-          {topExceptions.length ? (
-            topExceptions.map((item) => (
-              <div key={item.id} className="priorityItem">
-                <div>
-                  <span>{item.severity} priority</span>
-                  <strong>{item.type}</strong>
-                  <p>{item.recommendedAction}</p>
-                </div>
-                <Link className="button secondaryButton" href={item.entityRoute}>{exceptionActionLabel(item.type)}</Link>
-              </div>
-            ))
-          ) : (
-            <div className="priorityItem">
-              <div>
-                <span>No active exceptions</span>
-                <strong>Morning queue is clear</strong>
-                <p>Continue monitoring live visits and reports ready for family review.</p>
-              </div>
-              <Link className="button secondaryButton" href="/console/reports">Review reports</Link>
-            </div>
-          )}
-        </div>
-      </DashboardCard>
-
-      <div className="dashboardSplit">
-        <DashboardCard title="Live visit board">
-          <div className="kanbanGrid">
-            {columns.map((column) => (
-              <div key={column.label} className="kanbanColumn">
-                <div className="kanbanHeader">
-                  <strong>{column.label}</strong>
-                  <span>{column.items.length}</span>
-                </div>
-                {column.items.length ? (
-                  column.items.map((visit) => {
-                    const progress = getVisitProgress(visit);
-                    const incidentFlag = visit.incidentId ? 'Incident reported' : 'No incident';
-                    return (
-                      <article key={visit.id} className="visitCard">
-                        <div className="visitCardTop">
-                          <div>
-                            <strong>{getClient(visit.clientId)?.name}</strong>
-                            <span>{getCaregiver(visit.caregiverId)?.name} · {visit.startLabel}</span>
-                          </div>
-                          <StatusBadge status={getVisitDisplayStatus(visit)} />
-                        </div>
-                        <div className="visitMetaGrid">
-                          <div><span>Checklist</span><strong>{progress.checklist.label}</strong></div>
-                          <div><span>Note</span><strong>{visit.careNote ? 'Entered' : 'Missing'}</strong></div>
-                          <div><span>Risk</span><strong>{getVisitRiskLevel(visit)}</strong></div>
-                          <div><span>Nurse</span><strong>{nurseApprovals.find((item) => item.visitId === visit.id)?.status ?? 'Not required'}</strong></div>
-                          <div><span>Family update</span><strong>{nurseApprovals.some((item) => item.visitId === visit.id && item.blocksFamilyVisibility && item.status !== 'Approved') ? 'Approval blocked' : getFamilyUpdateStatus(visit)}</strong></div>
-                          <div><span>Medical</span><strong>{medicalAvailabilityRecords.find((item) => item.visitId === visit.id)?.status ?? 'Available'}</strong></div>
-                        </div>
-                        <p className="mutedMeta">{incidentFlag}</p>
-                        <div className="inlineActions">
-                          <Link className="textAction" href={`/console/visits/${visit.id}`}>View visit</Link>
-                          <button type="button" className="textAction" onClick={() => showToast('Caregiver contact note recorded in demo mode.')}>Contact Caregiver</button>
-                          <button type="button" className="textAction" onClick={() => showToast('Demo reminder recorded for the assigned caregiver.')}>Send Reminder</button>
-                        </div>
-                      </article>
-                    );
-                  })
-                ) : (
-                  <EmptyState title="No visits in this column" text="The board is clear for this live status." />
-                )}
-              </div>
-            ))}
-          </div>
-        </DashboardCard>
-
-        <div className="dashboardAsideStack">
-          <DashboardCard title="Exceptions queue">
-            {exceptionItems.length ? (
-              <div className="stackGrid">
-                {exceptionItems.map((item) => (
-                  <div key={item.id} className="miniSummaryCard">
-                    <div className="aiRiskSignalTop">
-                      <strong>{item.type}</strong>
-                      <StatusBadge status={item.severity} />
-                    </div>
-                    <p>{item.trigger}</p>
-                    <p><strong>Action:</strong> {item.recommendedAction}</p>
-                    <p><strong>Owner:</strong> {item.owner} · <strong>Due:</strong> {item.dueTime}</p>
-                    <div className="inlineActions">
-                      <Link className="textAction" href={item.entityRoute}>{exceptionActionLabel(item.type)}</Link>
-                      <button type="button" className="textAction" onClick={() => showToast('Follow-up marker saved in demo mode.')}>Mark follow-up needed</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <EmptyState title="No exceptions right now" text="Late visits, incidents, and concern follow-up will appear here." />
-            )}
-          </DashboardCard>
-          <DashboardCard title="Coordinator daily checklist">
-            <div className="stackGrid">
-              {[
-                ['reviewLateVisits', 'Review late visits'],
-                ['confirmMissedVisits', 'Confirm missed visits'],
-                ['reviewOpenIncidents', 'Review open incidents'],
-                ['respondToFamilyConcerns', 'Respond to family concerns'],
-                ['sendReadyWeeklyReports', 'Send ready weekly reports'],
-                ['checkVisitsWithoutNotes', 'Check visits without notes'],
-              ].map(([id, label]) => (
-                <label key={id} className="checklistRow checklistToggle">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(coordinatorChecklist[id])}
-                    onChange={() => toggleCoordinatorChecklistItem(id)}
-                  />
-                  <strong>{label}</strong>
-                </label>
-              ))}
-            </div>
-          </DashboardCard>
-        </div>
-      </div>
-    </AppShell>
-  );
-}
+export { OperationsScreen } from './features/operations/operations-screen';
 
 export { ExecutiveDashboardScreen } from './features/executive-dashboard/executive-dashboard-screen';
 
