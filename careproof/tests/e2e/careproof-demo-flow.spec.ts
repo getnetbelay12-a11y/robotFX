@@ -221,7 +221,28 @@ test('inspection center shows Maria visit documentation finding', async ({ page 
 });
 
 // ---------------------------------------------------------------------------
-// 11. Expiration center shows compliance risk + notification draft
+// 11. Medication management shows connected medication safety queues
+// ---------------------------------------------------------------------------
+
+test('medication management opens and shows Maria medication safety blockers', async ({ page }) => {
+  await page.goto('/console/medications');
+  await expect(page.getByRole('heading', { name: 'Medication management' })).toBeVisible();
+
+  await expect(page.getByText('Maria Johnson').first()).toBeVisible();
+  await expect(page.getByText('Lisinopril').first()).toBeVisible();
+  await expect(page.getByText('Low Stock').first()).toBeVisible();
+  await expect(page.getByText('Acetaminophen').first()).toBeVisible();
+  await expect(page.getByText('Expired').first()).toBeVisible();
+  await expect(page.getByText('Insulin Glargine').first()).toBeVisible();
+  await expect(page.getByText('Needs Nurse Review').first()).toBeVisible();
+
+  await page.goto('/console/visits/visit-maria-am');
+  await expect(page.getByText('Medication safety')).toBeVisible();
+  await expect(page.getByText('Open medication management')).toBeVisible();
+});
+
+// ---------------------------------------------------------------------------
+// 12. Expiration center shows compliance risk + notification draft
 // ---------------------------------------------------------------------------
 
 test('expiration center shows compliance risk and notification draft for Ana Smith CPR', async ({ page }) => {
@@ -247,7 +268,7 @@ test('expiration center shows compliance risk and notification draft for Ana Smi
 });
 
 // ---------------------------------------------------------------------------
-// 12. Caregiver today page
+// 13. Caregiver today page
 // ---------------------------------------------------------------------------
 
 test('caregiver today page shows assigned visits with Maria Johnson as next visit', async ({ page }) => {
@@ -263,7 +284,7 @@ test('caregiver today page shows assigned visits with Maria Johnson as next visi
 });
 
 // ---------------------------------------------------------------------------
-// 13. Caregiver check-in → checklist → note → checkout (demo-only)
+// 14. Caregiver check-in → checklist → note → checkout (demo-only)
 // ---------------------------------------------------------------------------
 
 test('caregiver completes Maria visit: check-in, tasks, note, checkout', async ({ page }) => {
@@ -303,7 +324,7 @@ test('caregiver completes Maria visit: check-in, tasks, note, checkout', async (
 });
 
 // ---------------------------------------------------------------------------
-// 14. Notification draft appears (inspection finding recommended action)
+// 15. Notification draft appears (inspection finding recommended action)
 // ---------------------------------------------------------------------------
 
 test('inspection center recommended action text acts as notification draft', async ({ page }) => {
@@ -320,7 +341,7 @@ test('inspection center recommended action text acts as notification draft', asy
 });
 
 // ---------------------------------------------------------------------------
-// 15. System readiness does NOT claim production-ready
+// 16. System readiness does NOT claim production-ready
 // ---------------------------------------------------------------------------
 
 test('system readiness honestly reports production blockers', async ({ page }) => {

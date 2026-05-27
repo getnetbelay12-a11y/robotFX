@@ -26,6 +26,7 @@ import {
   getClient,
   inspectionFindings,
   medicalAvailabilityRecords,
+  medicationRecords,
   nurseApprovals,
 } from '../../../data/demoCareProofData';
 import {
@@ -36,6 +37,7 @@ import {
 import {
   generateFamilyUpdateDraftApi,
   generateVisitSummaryApi,
+  fetchMedicationRecordsApi,
   loadCanonicalDemoVisitApi,
 } from '../../../lib/api-client';
 import { useDemoStore } from '../../../lib/demoStore';
@@ -48,6 +50,7 @@ export function VisitDetailScreen({ visitId }: { visitId: string }) {
   const [visitSummaryDraft, setVisitSummaryDraft] = useState<{ internalSummary: string; familySafeSummary: string; riskFlags: string[]; requiresReview: boolean; label: string } | null>(null);
   const [familyDraft, setFamilyDraft] = useState<{ familyUpdateDraft: string; requiresApproval: boolean; label: string } | null>(null);
   const [familyDraftText, setFamilyDraftText] = useState('');
+  const [visitMedications, setVisitMedications] = useState(medicationRecords);
   const [aiLoading, setAiLoading] = useState(false);
   const visitRef = useRef<Visit | undefined>(visit);
   const showToastRef = useRef(showToast);
@@ -78,6 +81,12 @@ export function VisitDetailScreen({ visitId }: { visitId: string }) {
     };
   }, [visitId]);
 
+  useEffect(() => {
+    fetchMedicationRecordsApi().then((data) => {
+      if (data.length > 0) setVisitMedications(data);
+    }).catch(() => {});
+  }, []);
+
   if (!visit) {
     return (
       <AppShell title="Visit not found" subtitle="The requested visit record is not available." navItems={consoleLinks}>
@@ -95,8 +104,11 @@ export function VisitDetailScreen({ visitId }: { visitId: string }) {
   const linkedApprovals = nurseApprovals.filter((item) => item.visitId === visit.id || item.clientId === visit.clientId);
   const linkedFindings = inspectionFindings.filter((item) => item.visitId === visit.id || item.clientId === visit.clientId);
   const linkedAvailability = medicalAvailabilityRecords.filter((item) => item.visitId === visit.id || item.clientId === visit.clientId);
+  const linkedMedications = visitMedications.filter((item) => item.visitId === visit.id || item.clientId === visit.clientId);
+  const medicationBlockers = linkedMedications.filter((item) => item.blocksVisit || ['Missing', 'Low Stock', 'Expired', 'Order Expired', 'Needs Nurse Review', 'Needs Refill'].includes(item.status));
   const nurseApprovalStatus: string = linkedApprovals.find((item) => item.blocksFamilyVisibility)?.status ?? linkedApprovals[0]?.status ?? 'Not Required';
   const medicalAvailabilityStatus: string = linkedAvailability.find((item) => item.blocksVisit)?.status ?? linkedAvailability[0]?.status ?? 'Available';
+  const medicationReadinessStatus: string = medicationBlockers[0]?.status ?? (linkedMedications.length ? 'Available' : 'Not linked');
 
   return (
     <AppShell
@@ -126,6 +138,7 @@ export function VisitDetailScreen({ visitId }: { visitId: string }) {
         <StatCard label="Incident" value={incidentStatus} tone={incident ? 'warning' : 'neutral'} />
         <StatCard label="Nurse approval" value={nurseApprovalStatus} tone={nurseApprovalStatus === 'Approved' ? 'positive' : nurseApprovalStatus === 'Not Required' ? 'neutral' : 'warning'} href="/console/nurse-approvals" />
         <StatCard label="Medical readiness" value={medicalAvailabilityStatus} tone={medicalAvailabilityStatus === 'Available' ? 'positive' : 'warning'} href="/console/medical-availability" />
+        <StatCard label="Medication readiness" value={medicationReadinessStatus} tone={medicationReadinessStatus === 'Available' || medicationReadinessStatus === 'Not linked' ? 'neutral' : 'danger'} href="/console/medications" />
       </div>
 
       <div className="detailMetaGrid">
@@ -155,6 +168,11 @@ export function VisitDetailScreen({ visitId }: { visitId: string }) {
               <div className="aiRiskSignalTop"><strong>Medical availability</strong><StatusBadge status={medicalAvailabilityStatus} /></div>
               <p>{linkedAvailability[0]?.nextAction ?? 'Medical availability is currently clear for the visit.'}</p>
               <Link className="textAction" href="/console/medical-availability">Open readiness checklist</Link>
+            </div>
+            <div className="miniSummaryCard">
+              <div className="aiRiskSignalTop"><strong>Medication safety</strong><StatusBadge status={medicationReadinessStatus} /></div>
+              <p>{medicationBlockers[0]?.nextAction ?? linkedMedications[0]?.nextAction ?? 'No medication blocker is linked to this visit.'}</p>
+              <Link className="textAction" href="/console/medications">Open medication management</Link>
             </div>
           </div>
         </DashboardCard>

@@ -29,6 +29,7 @@ import { SocialWorkCasesModule } from './social-work-cases/social-work-cases.mod
 import { IntakeRecordsModule } from './intake-records/intake-records.module';
 import { MedicalAvailabilityModule } from './medical-availability/medical-availability.module';
 import { ExpirationRecordsModule } from './expiration-records/expiration-records.module';
+import { MedicationsModule } from './medications/medications.module';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { ExpirationRecordsModule } from './expiration-records/expiration-records
     IntakeRecordsModule,
     MedicalAvailabilityModule,
     ExpirationRecordsModule,
+    MedicationsModule,
   ],
   providers: [
     {

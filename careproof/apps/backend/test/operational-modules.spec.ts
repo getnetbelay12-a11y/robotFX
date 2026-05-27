@@ -13,6 +13,7 @@ import { SocialWorkCasesService } from '../src/social-work-cases/social-work-cas
 import { IntakeRecordsService } from '../src/intake-records/intake-records.service';
 import { MedicalAvailabilityService } from '../src/medical-availability/medical-availability.service';
 import { ExpirationRecordsService } from '../src/expiration-records/expiration-records.service';
+import { MedicationsService } from '../src/medications/medications.service';
 import { AuthUser } from '../src/auth/types';
 
 describe('Operational modules', () => {
@@ -26,6 +27,13 @@ describe('Operational modules', () => {
   let intakeRecordId: string;
   let medicalAvailabilityId: string;
   let expirationRecordId: string;
+  let medicationRecordId: string;
+  let lowStockMedicationId: string;
+  let expiredMedicationId: string;
+  let highRiskMedicationId: string;
+  let medicationBranchId: string;
+  let caregiverActor: AuthUser;
+  let familyActor: AuthUser;
 
   let nurseApprovalsService: NurseApprovalsService;
   let inspectionFindingsService: InspectionFindingsService;
@@ -33,6 +41,7 @@ describe('Operational modules', () => {
   let intakeRecordsService: IntakeRecordsService;
   let medicalAvailabilityService: MedicalAvailabilityService;
   let expirationRecordsService: ExpirationRecordsService;
+  let medicationsService: MedicationsService;
 
   beforeAll(async () => {
     await connect(process.env.MONGODB_URI!);
@@ -59,6 +68,29 @@ describe('Operational modules', () => {
     intakeRecordId = (await connection.collection('intakeRecords').findOne({ agencyId: new Types.ObjectId(agencyId), branchId: nurseApproval.branchId }))!._id.toString();
     medicalAvailabilityId = (await connection.collection('medicalAvailability').findOne({ agencyId: new Types.ObjectId(agencyId) }))!._id.toString();
     expirationRecordId = (await connection.collection('expirationRecords').findOne({ agencyId: new Types.ObjectId(agencyId) }))!._id.toString();
+    const metformin = (await connection.collection('medicationRecords').findOne({ agencyId: new Types.ObjectId(agencyId), medicationName: 'Metformin' }))!;
+    const lisinopril = (await connection.collection('medicationRecords').findOne({ agencyId: new Types.ObjectId(agencyId), medicationName: 'Lisinopril' }))!;
+    const acetaminophen = (await connection.collection('medicationRecords').findOne({ agencyId: new Types.ObjectId(agencyId), medicationName: 'Acetaminophen' }))!;
+    const insulin = (await connection.collection('medicationRecords').findOne({ agencyId: new Types.ObjectId(agencyId), medicationName: 'Insulin Glargine' }))!;
+    medicationRecordId = metformin._id.toString();
+    lowStockMedicationId = lisinopril._id.toString();
+    expiredMedicationId = acetaminophen._id.toString();
+    highRiskMedicationId = insulin._id.toString();
+    medicationBranchId = metformin.branchId.toString();
+    const caregiverUser = await connection.collection('users').findOne({ email: 'caregiver1@careproof.demo' });
+    const familyUser = await connection.collection('users').findOne({ email: 'family1@careproof.demo' });
+    caregiverActor = {
+      sub: caregiverUser!._id.toString(),
+      agencyId,
+      role: UserRole.CAREGIVER,
+      email: 'caregiver1@careproof.demo',
+    };
+    familyActor = {
+      sub: familyUser!._id.toString(),
+      agencyId,
+      role: UserRole.FAMILY_MEMBER,
+      email: 'family1@careproof.demo',
+    };
 
     await connection.close();
 
@@ -69,6 +101,7 @@ describe('Operational modules', () => {
     intakeRecordsService = moduleRef.get(IntakeRecordsService);
     medicalAvailabilityService = moduleRef.get(MedicalAvailabilityService);
     expirationRecordsService = moduleRef.get(ExpirationRecordsService);
+    medicationsService = moduleRef.get(MedicationsService);
   });
 
   afterAll(async () => {
@@ -289,6 +322,78 @@ describe('Operational modules', () => {
     });
   });
 
+  describe('Medications', () => {
+    it('lists medication records for the agency with seeded safety states', async () => {
+      const result = await medicationsService.list(adminActor);
+      expect(result.length).toBeGreaterThanOrEqual(7);
+      expect(result.some((item) => item.medicationName === 'Metformin')).toBe(true);
+      expect(result.some((item) => item.status === 'Low Stock')).toBe(true);
+      expect(result.some((item) => item.status === 'Expired')).toBe(true);
+      expect(result.some((item) => item.requiresNurseReview)).toBe(true);
+    });
+
+    it('enforces branch scoping for branch-scoped nurses', async () => {
+      const branchNurseActor: AuthUser = {
+        ...adminActor,
+        role: UserRole.NURSE,
+        branchId: otherBranchId,
+      };
+      await expect(medicationsService.findOne(branchNurseActor, medicationRecordId)).rejects.toThrow();
+      const visible = await medicationsService.list({ ...branchNurseActor, branchId: medicationBranchId });
+      expect(visible.some((item) => item._id.toString() === medicationRecordId)).toBe(true);
+    });
+
+    it('blocks family from internal medication records', async () => {
+      const result = await medicationsService.list(familyActor);
+      expect(result.some((item) => item._id.toString() === medicationRecordId)).toBe(false);
+      await expect(medicationsService.findOne(familyActor, medicationRecordId)).rejects.toThrow();
+    });
+
+    it('allows caregiver assigned-client read with internal notes removed', async () => {
+      const result = await medicationsService.list(caregiverActor);
+      const mariaMedication = result.find((item) => item._id.toString() === medicationRecordId);
+      expect(mariaMedication).toBeTruthy();
+      expect(mariaMedication!.notes).toBeUndefined();
+    });
+
+    it('creates risk surfaces for expired medication', async () => {
+      const result = await medicationsService.findOne(adminActor, expiredMedicationId);
+      expect(result.status).toBe('Expired');
+      const findings = await inspectionFindingsService.listFindings(adminActor);
+      expect(findings.some((finding) => finding.title === 'Medication expired' && finding.clientName === 'Maria Johnson')).toBe(true);
+    });
+
+    it('quantity low update creates blocker risk', async () => {
+      const result = await medicationsService.updateQuantity(adminActor, medicationRecordId, {
+        quantityAvailable: 1,
+        notes: 'Test low quantity.',
+      });
+      expect(result.status).toBe('Low Stock');
+      const blockers = await medicalAvailabilityService.list(adminActor);
+      expect(blockers.some((blocker) => blocker.serviceType.includes('Metformin') && blocker.status === 'unavailable')).toBe(true);
+    });
+
+    it('requires nurse review and creates approval/risk', async () => {
+      const result = await medicationsService.requestNurseReview(adminActor, lowStockMedicationId, {
+        notes: 'Test review request.',
+      });
+      expect(result.status).toBe('Needs Nurse Review');
+      expect(result.nurseApprovalId).toBeTruthy();
+      const findings = await inspectionFindingsService.listFindings(adminActor);
+      expect(findings.some((finding) => finding.title === 'Medication task attempted without valid order' && finding.clientName === 'Maria Johnson')).toBe(true);
+    });
+
+    it('reconcile endpoint updates lastReconciledAt and nextReconciliationDue', async () => {
+      const result = await medicationsService.reconcile(adminActor, highRiskMedicationId, {
+        lastReconciledAt: '2026-05-27',
+        nextReconciliationDue: '2026-06-26',
+        notes: 'Reconciled during test.',
+      });
+      expect(result.lastReconciledAt).toBe('2026-05-27');
+      expect(result.nextReconciliationDue).toBe('2026-06-26');
+    });
+  });
+
   describe('RBAC enforcement', () => {
     it('blocks FAMILY_MEMBER from reading nurse approvals', async () => {
       const familyActor: AuthUser = {
@@ -328,6 +433,7 @@ describe('Operational modules', () => {
       };
       await expect(intakeRecordsService.list(socialWorkerActor)).rejects.toThrow();
       await expect(nurseApprovalsService.list(socialWorkerActor)).rejects.toThrow();
+      await expect(medicationsService.list(socialWorkerActor)).rejects.toThrow();
     });
 
     it('blocks INTAKE_AGENT from clinical review records', async () => {

@@ -27,6 +27,7 @@ import {
   inspectionFindings,
   inspectionRules,
   medicalAvailabilityRecords,
+  medicationRecords,
   nurseApprovals,
   socialWorkCases,
 } from '../data/demoCareProofData';
@@ -107,6 +108,7 @@ export const consoleLinks = [
   ['Schedule', '/console/schedule'],
   ['--CLINICAL REVIEW', ''],
   ['Nurse Approvals', '/console/nurse-approvals'],
+  ['Medication Management', '/console/medications'],
   ['Inspection Center', '/console/inspection-center'],
   ['Social Work', '/console/social-work'],
   ['Medical Availability', '/console/medical-availability'],
@@ -1883,6 +1885,8 @@ export function ReportsScreen() {
   const approvalBlockedUpdates = nurseApprovals.filter((item) => item.blocksFamilyVisibility && !['Approved', 'Rejected'].includes(item.status)).length;
   const openInspectionCount = inspectionFindings.filter((item) => !['Resolved', 'Dismissed'].includes(item.status)).length;
   const expirationBlockerCount = expirationRecords.filter((item) => item.blocksVisits || ['Expired', 'Missing', 'Blocker', 'Expiring in 7 days'].includes(item.state)).length;
+  const medicationBlockerCount = medicationRecords.filter((item) => item.blocksVisit || ['Missing', 'Low Stock', 'Expired', 'Order Expired', 'Needs Nurse Review', 'Needs Refill'].includes(item.status)).length;
+  const medicationReconciliationDue = medicationRecords.filter((item) => item.nextReconciliationDue <= new Date().toISOString().split('T')[0]).length;
   const exportVisitProof = () => {
     downloadCsvFile('careproof-visit-proof.csv', [
       ['client', 'caregiver', 'scheduled', 'status', 'checkIn', 'checkOut', 'checklist', 'familyUpdate'],
@@ -1982,6 +1986,7 @@ export function ReportsScreen() {
           <StatCard label="Approvals blocking family" value={approvalBlockedUpdates} tone={approvalBlockedUpdates ? 'danger' : 'positive'} />
           <StatCard label="Inspection findings" value={openInspectionCount} tone={openInspectionCount ? 'warning' : 'positive'} />
           <StatCard label="Compliance blockers" value={expirationBlockerCount} tone={expirationBlockerCount ? 'danger' : 'positive'} />
+          <StatCard label="Medication blockers" value={medicationBlockerCount} tone={medicationBlockerCount ? 'danger' : 'positive'} />
         </div>
 
         <DashboardCard title="Weekly Family Reports">
@@ -2026,6 +2031,15 @@ export function ReportsScreen() {
               <li>{expirationBlockerCount} blockers or missing items</li>
             </ul>
             <Link className="button secondaryButton" href="/console/expiration-center">Open Report</Link>
+          </DashboardCard>
+          <DashboardCard title="Medication Safety Report">
+            <ul className="featureList">
+              <li>{medicationRecords.filter((item) => item.status === 'Low Stock' || item.status === 'Missing').length} availability blockers</li>
+              <li>{medicationRecords.filter((item) => item.status === 'Expired' || item.status === 'Order Expired').length} expiration blockers</li>
+              <li>{medicationReconciliationDue} reconciliation items due</li>
+              <li>{medicationRecords.filter((item) => item.isHighRisk || item.requiresNurseReview).length} high-risk review items</li>
+            </ul>
+            <Link className="button secondaryButton" href="/console/medications">Open Report</Link>
           </DashboardCard>
         </div>
 
@@ -3394,6 +3408,8 @@ export function NotificationsCenterScreen() {
 }
 
 export { NurseApprovalsScreen } from './features/nurse-approvals/nurse-approvals-screen';
+
+export { MedicationManagementScreen } from './features/medications/medication-management-screen';
 
 export { InspectionCenterScreen } from './features/inspection-center/inspection-center-screen';
 

@@ -14,6 +14,8 @@ import type {
   InspectionRule,
   IntakeRecord,
   MedicalAvailabilityRecord,
+  MedicationRecord,
+  MedicationStatus,
   NurseApproval,
   SocialWorkCase,
   Visit,
@@ -24,6 +26,7 @@ import {
   mapInspectionRule,
   mapIntakeRecord,
   mapMedicalAvailability,
+  mapMedicationRecord,
   mapNurseApproval,
   mapSocialWorkCase,
 } from './api-mappers';
@@ -33,6 +36,7 @@ import type {
   BackendInspectionRule,
   BackendIntakeRecord,
   BackendMedicalAvailability,
+  BackendMedicationRecord,
   BackendNurseApproval,
   BackendSocialWorkCase,
 } from './api-types';
@@ -676,4 +680,53 @@ export async function updateRenewalStatusApi(
     body: JSON.stringify({ status }),
   });
   return mapExpirationRecord(raw);
+}
+
+export async function fetchMedicationRecordsApi(): Promise<MedicationRecord[]> {
+  const raw = await callProtectedApi<BackendMedicationRecord[]>('owner', '/medications');
+  return raw.map(mapMedicationRecord);
+}
+
+export async function updateMedicationStatusApi(
+  id: string,
+  status: MedicationStatus,
+  notes?: string,
+): Promise<MedicationRecord> {
+  const raw = await callProtectedApi<BackendMedicationRecord>('owner', `/medications/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status, notes }),
+  });
+  return mapMedicationRecord(raw);
+}
+
+export async function reconcileMedicationApi(
+  id: string,
+  nextReconciliationDue: string,
+  notes?: string,
+): Promise<MedicationRecord> {
+  const raw = await callProtectedApi<BackendMedicationRecord>('owner', `/medications/${id}/reconcile`, {
+    method: 'PATCH',
+    body: JSON.stringify({ nextReconciliationDue, notes }),
+  });
+  return mapMedicationRecord(raw);
+}
+
+export async function updateMedicationQuantityApi(
+  id: string,
+  quantityAvailable: number,
+  notes?: string,
+): Promise<MedicationRecord> {
+  const raw = await callProtectedApi<BackendMedicationRecord>('owner', `/medications/${id}/quantity`, {
+    method: 'PATCH',
+    body: JSON.stringify({ quantityAvailable, notes }),
+  });
+  return mapMedicationRecord(raw);
+}
+
+export async function requestMedicationNurseReviewApi(id: string, notes?: string): Promise<MedicationRecord> {
+  const raw = await callProtectedApi<BackendMedicationRecord>('owner', `/medications/${id}/nurse-review`, {
+    method: 'PATCH',
+    body: JSON.stringify({ notes }),
+  });
+  return mapMedicationRecord(raw);
 }

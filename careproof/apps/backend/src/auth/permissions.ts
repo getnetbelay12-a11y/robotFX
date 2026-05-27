@@ -24,6 +24,8 @@ export type PermissionAction =
   | 'intake.write'
   | 'medical_availability.read'
   | 'medical_availability.write'
+  | 'medication.read'
+  | 'medication.write'
   | 'expiration.read'
   | 'expiration.write';
 
@@ -39,6 +41,7 @@ const ROLE_PERMISSIONS: Record<UserRole, PermissionAction[]> = {
     'social_work.read', 'social_work.write',
     'intake.read', 'intake.write',
     'medical_availability.read', 'medical_availability.write',
+    'medication.read', 'medication.write',
     'expiration.read', 'expiration.write',
   ],
   [UserRole.AGENCY_OWNER]: [
@@ -52,6 +55,7 @@ const ROLE_PERMISSIONS: Record<UserRole, PermissionAction[]> = {
     'social_work.read', 'social_work.write',
     'intake.read', 'intake.write',
     'medical_availability.read', 'medical_availability.write',
+    'medication.read', 'medication.write',
     'expiration.read', 'expiration.write',
   ],
   [UserRole.AGENCY_ADMIN]: [
@@ -65,6 +69,7 @@ const ROLE_PERMISSIONS: Record<UserRole, PermissionAction[]> = {
     'social_work.read', 'social_work.write',
     'intake.read', 'intake.write',
     'medical_availability.read', 'medical_availability.write',
+    'medication.read', 'medication.write',
     'expiration.read', 'expiration.write',
   ],
   [UserRole.CARE_COORDINATOR]: [
@@ -87,6 +92,7 @@ const ROLE_PERMISSIONS: Record<UserRole, PermissionAction[]> = {
     'nurse_approval.read', 'nurse_approval.write',
     'inspection.read',
     'medical_availability.read',
+    'medication.read', 'medication.write',
     'expiration.read',
   ],
   [UserRole.SOCIAL_WORKER]: [
@@ -102,6 +108,7 @@ const ROLE_PERMISSIONS: Record<UserRole, PermissionAction[]> = {
     'client.read', 'client.write',
     'intake.read', 'intake.write',
     'medical_availability.read',
+    'medication.read',
     'expiration.read',
   ],
   [UserRole.CAREGIVER]: [
@@ -110,9 +117,10 @@ const ROLE_PERMISSIONS: Record<UserRole, PermissionAction[]> = {
     'nurse_approval.read',
     'inspection.read',
     'medical_availability.read',
+    'medication.read',
     'expiration.read',
   ],
-  [UserRole.FAMILY_MEMBER]: ['report.read'],
+  [UserRole.FAMILY_MEMBER]: ['report.read', 'medication.read'],
   [UserRole.CLIENT]: [],
 };
 

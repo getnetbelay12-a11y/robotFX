@@ -5,6 +5,8 @@ import {
   mapInspectionRule,
   mapIntakeRecord,
   mapMedicalAvailability,
+  mapMedicationRecord,
+  mapMedicationToExpirationRecord,
   mapNurseApproval,
   mapSocialWorkCase,
 } from '../api-mappers';
@@ -14,6 +16,7 @@ import type {
   BackendInspectionRule,
   BackendIntakeRecord,
   BackendMedicalAvailability,
+  BackendMedicationRecord,
   BackendNurseApproval,
   BackendSocialWorkCase,
 } from '../api-types';
@@ -436,5 +439,92 @@ describe('mapExpirationRecord', () => {
 
   it('sets renewalStatus=Not started when renewalSubmittedAt absent', () => {
     expect(mapExpirationRecord(raw).renewalStatus).toBe('Not started');
+  });
+
+  it('maps medication document categories to Medication', () => {
+    expect(mapExpirationRecord({ ...raw, documentType: 'Medication Expiration: Acetaminophen' }).category).toBe('Medication');
+  });
+});
+
+describe('mapMedicationRecord', () => {
+  const raw: BackendMedicationRecord = {
+    _id: 'med-1',
+    agencyId: 'ag-1',
+    branchId: 'branch-1',
+    clientId: 'client-maria',
+    clientName: 'Maria Johnson',
+    visitId: 'visit-maria-am',
+    carePlanId: 'care-plan-maria',
+    medicationName: 'Lisinopril',
+    genericName: 'Lisinopril',
+    strength: '10 mg',
+    form: 'Tablet',
+    route: 'Oral',
+    dose: '1 tablet',
+    frequency: 'Daily',
+    purpose: 'Blood pressure support',
+    prescriberName: 'Dr. Shah',
+    pharmacyName: 'Northside Pharmacy',
+    startDate: '2026-01-01T00:00:00.000Z',
+    medicationExpiryDate: '2026-09-01T00:00:00.000Z',
+    orderExpiryDate: '2026-06-26T00:00:00.000Z',
+    lastReconciledAt: '2026-05-01T00:00:00.000Z',
+    nextReconciliationDue: '2026-05-27T00:00:00.000Z',
+    quantityAvailable: 3,
+    minimumRequiredQuantity: 7,
+    storageRequirement: 'Room temperature',
+    isHighRisk: false,
+    requiresNurseReview: false,
+    nurseApprovalId: null,
+    status: 'Low Stock',
+    notes: 'Supply low.',
+    familyVisible: false,
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+
+  it('maps canonical medication fields and linked ids', () => {
+    const result = mapMedicationRecord(raw);
+    expect(result.id).toBe('med-1');
+    expect(result.branchId).toBe('branch-1');
+    expect(result.clientId).toBe('client-maria');
+    expect(result.visitId).toBe('visit-maria-am');
+    expect(result.medicationName).toBe('Lisinopril');
+  });
+
+  it('maps low stock as a visit blocker with refill next action', () => {
+    const result = mapMedicationRecord(raw);
+    expect(result.status).toBe('Low Stock');
+    expect(result.blocksVisit).toBe(true);
+    expect(result.nextAction).toContain('refill');
+  });
+
+  it('maps nurse review requirement from backend data', () => {
+    const result = mapMedicationRecord({
+      ...raw,
+      status: 'Needs Nurse Review',
+      isHighRisk: true,
+      requiresNurseReview: true,
+      nurseApprovalId: 'approval-1',
+    });
+    expect(result.requiresNurseReview).toBe(true);
+    expect(result.isHighRisk).toBe(true);
+    expect(result.nurseApprovalId).toBe('approval-1');
+    expect(result.nextAction).toContain('nurse review');
+  });
+
+  it('maps ISO dates to date-only values', () => {
+    const result = mapMedicationRecord(raw);
+    expect(result.startDate).toBe('2026-01-01');
+    expect(result.medicationExpiryDate).toBe('2026-09-01');
+    expect(result.orderExpiryDate).toBe('2026-06-26');
+  });
+
+  it('maps medication expiration risk records', () => {
+    const record = mapMedicationRecord({ ...raw, medicationExpiryDate: '2026-05-26', status: 'Expired' });
+    const expiration = mapMedicationToExpirationRecord(record, 'medication');
+    expect(expiration.category).toBe('Medication');
+    expect(expiration.state).toBe('Expired');
+    expect(expiration.blocksVisits).toBe(true);
   });
 });

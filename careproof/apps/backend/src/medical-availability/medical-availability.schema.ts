@@ -14,6 +14,15 @@ export class MedicalAvailability {
   @Prop({ type: Types.ObjectId })
   clientId!: Types.ObjectId;
 
+  @Prop({ type: Types.ObjectId, index: true })
+  branchId?: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, default: null })
+  visitId?: Types.ObjectId | null;
+
+  @Prop({ type: Types.ObjectId, default: null })
+  sourceMedicationId?: Types.ObjectId | null;
+
   @Prop({ required: true })
   serviceType!: string;
 
@@ -38,3 +47,4 @@ export class MedicalAvailability {
 
 export const MedicalAvailabilitySchema = SchemaFactory.createForClass(MedicalAvailability);
 MedicalAvailabilitySchema.index({ agencyId: 1, status: 1 });
+MedicalAvailabilitySchema.index({ agencyId: 1, branchId: 1 });

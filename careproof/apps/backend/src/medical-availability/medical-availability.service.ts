@@ -17,8 +17,10 @@ export class MedicalAvailabilityService {
 
   async list(actor: AuthUser) {
     requirePermission(actor.role, 'medical_availability.read');
+    const filter: Record<string, unknown> = { agencyId: new Types.ObjectId(actor.agencyId), deletedAt: null };
+    if (actor.branchId) filter.branchId = new Types.ObjectId(actor.branchId);
     return this.model
-      .find({ agencyId: new Types.ObjectId(actor.agencyId), deletedAt: null })
+      .find(filter)
       .sort({ scheduledDate: 1 })
       .lean();
   }

@@ -14,6 +14,9 @@ export class ExpirationRecord {
   @Prop({ type: Types.ObjectId })
   caregiverId!: Types.ObjectId;
 
+  @Prop({ type: Types.ObjectId, default: null })
+  sourceMedicationId?: Types.ObjectId | null;
+
   @Prop({ required: true })
   documentType!: string;
 
@@ -33,3 +36,4 @@ export class ExpirationRecord {
 export const ExpirationRecordSchema = SchemaFactory.createForClass(ExpirationRecord);
 ExpirationRecordSchema.index({ agencyId: 1, status: 1 });
 ExpirationRecordSchema.index({ agencyId: 1, expiryDate: 1 });
+ExpirationRecordSchema.index({ agencyId: 1, sourceMedicationId: 1 });

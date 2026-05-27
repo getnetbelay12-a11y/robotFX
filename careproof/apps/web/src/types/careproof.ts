@@ -685,7 +685,7 @@ export type ExpiryState = 'Valid' | 'Expiring in 30 days' | 'Expiring in 7 days'
 
 export interface ExpirationRecord {
   id: string;
-  category: 'Caregiver' | 'Nurse' | 'Client' | 'Agency';
+  category: 'Caregiver' | 'Nurse' | 'Client' | 'Agency' | 'Medication';
   ownerId?: string;
   ownerName: string;
   item: string;
@@ -695,4 +695,52 @@ export interface ExpirationRecord {
   renewalStatus: 'Not started' | 'Requested' | 'In progress' | 'Submitted' | 'Verified';
   blocksVisits: boolean;
   notificationDraft: string;
+}
+
+export type MedicationStatus =
+  | 'Available'
+  | 'Low Stock'
+  | 'Missing'
+  | 'Expired'
+  | 'Order Expired'
+  | 'Needs Refill'
+  | 'Needs Nurse Review'
+  | 'Held'
+  | 'Discontinued';
+
+export interface MedicationRecord {
+  id: string;
+  agencyId?: string;
+  branchId: string;
+  clientId: string;
+  clientName?: string;
+  visitId?: string;
+  carePlanId?: string;
+  medicationName: string;
+  genericName?: string;
+  strength: string;
+  form: string;
+  route: string;
+  dose: string;
+  frequency: string;
+  purpose: string;
+  prescriberName: string;
+  pharmacyName?: string;
+  startDate: string;
+  stopDate?: string;
+  medicationExpiryDate: string;
+  orderExpiryDate: string;
+  lastReconciledAt: string;
+  nextReconciliationDue: string;
+  quantityAvailable: number;
+  minimumRequiredQuantity: number;
+  storageRequirement: string;
+  isHighRisk: boolean;
+  requiresNurseReview: boolean;
+  nurseApprovalId?: string;
+  status: MedicationStatus;
+  notes?: string;
+  familyVisible: boolean;
+  nextAction: string;
+  blocksVisit: boolean;
 }

@@ -11,6 +11,7 @@ import type {
   InspectionStatus,
   IntakeRecord,
   MedicalAvailabilityRecord,
+  MedicationRecord,
   NurseApproval,
   SocialWorkCase,
   SocialWorkCaseStatus,
@@ -22,6 +23,7 @@ import type {
   BackendInspectionRule,
   BackendIntakeRecord,
   BackendMedicalAvailability,
+  BackendMedicationRecord,
   BackendNurseApproval,
   BackendSocialWorkCase,
 } from './api-types';
@@ -234,9 +236,10 @@ const EXPIRY_STATE: Record<BackendExpirationRecord['status'], ExpiryState> = {
 };
 
 export function mapExpirationRecord(raw: BackendExpirationRecord): ExpirationRecord {
+  const isMedication = raw.documentType.toLowerCase().includes('medication');
   return {
     id: raw._id,
-    category: 'Caregiver',
+    category: isMedication ? 'Medication' : 'Caregiver',
     ownerId: raw.caregiverId,
     ownerName: raw.caregiverName,
     item: raw.documentType,
@@ -246,5 +249,93 @@ export function mapExpirationRecord(raw: BackendExpirationRecord): ExpirationRec
     renewalStatus: raw.renewalSubmittedAt ? 'Submitted' : 'Not started',
     blocksVisits: raw.status === 'expired',
     notificationDraft: '',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Medication Management
+// ---------------------------------------------------------------------------
+
+function dateOnly(value: string): string {
+  return value.includes('T') ? value.slice(0, 10) : value;
+}
+
+function medicationBlocksVisit(raw: BackendMedicationRecord): boolean {
+  return ['Low Stock', 'Missing', 'Expired', 'Order Expired', 'Needs Refill', 'Needs Nurse Review'].includes(raw.status);
+}
+
+function medicationNextAction(raw: BackendMedicationRecord): string {
+  if (raw.status === 'Missing') return 'Locate medication or pause medication task before visit starts.';
+  if (raw.status === 'Expired') return 'Remove expired medication and obtain valid replacement.';
+  if (raw.status === 'Order Expired') return 'Obtain renewed order before medication-related task continues.';
+  if (raw.status === 'Low Stock') return 'Create refill follow-up and confirm supply before next visit.';
+  if (raw.status === 'Needs Refill') return 'Confirm refill order and pharmacy pickup plan.';
+  if (raw.status === 'Needs Nurse Review' || raw.requiresNurseReview) return 'Route to nurse review before family visibility or task clearance.';
+  if (raw.nextReconciliationDue <= new Date().toISOString().split('T')[0]) return 'Mark reconciled after medication list review.';
+  return 'Continue monitoring availability, order validity, and reconciliation due date.';
+}
+
+export function mapMedicationRecord(raw: BackendMedicationRecord): MedicationRecord {
+  return {
+    id: raw._id,
+    agencyId: raw.agencyId,
+    branchId: raw.branchId,
+    clientId: raw.clientId,
+    clientName: raw.clientName,
+    visitId: raw.visitId ?? undefined,
+    carePlanId: raw.carePlanId ?? undefined,
+    medicationName: raw.medicationName,
+    genericName: raw.genericName,
+    strength: raw.strength,
+    form: raw.form,
+    route: raw.route,
+    dose: raw.dose,
+    frequency: raw.frequency,
+    purpose: raw.purpose,
+    prescriberName: raw.prescriberName,
+    pharmacyName: raw.pharmacyName,
+    startDate: dateOnly(raw.startDate),
+    stopDate: raw.stopDate ? dateOnly(raw.stopDate) : undefined,
+    medicationExpiryDate: dateOnly(raw.medicationExpiryDate),
+    orderExpiryDate: dateOnly(raw.orderExpiryDate),
+    lastReconciledAt: dateOnly(raw.lastReconciledAt),
+    nextReconciliationDue: dateOnly(raw.nextReconciliationDue),
+    quantityAvailable: raw.quantityAvailable,
+    minimumRequiredQuantity: raw.minimumRequiredQuantity,
+    storageRequirement: raw.storageRequirement,
+    isHighRisk: raw.isHighRisk,
+    requiresNurseReview: raw.requiresNurseReview,
+    nurseApprovalId: raw.nurseApprovalId ?? undefined,
+    status: raw.status,
+    notes: raw.notes,
+    familyVisible: raw.familyVisible,
+    nextAction: medicationNextAction(raw),
+    blocksVisit: medicationBlocksVisit(raw),
+  };
+}
+
+export function mapMedicationToExpirationRecord(record: MedicationRecord, kind: 'medication' | 'order' = 'medication'): ExpirationRecord {
+  const expirationDate = kind === 'medication' ? record.medicationExpiryDate : record.orderExpiryDate;
+  const today = new Date().toISOString().split('T')[0];
+  const daysUntilExpiry = Math.ceil((new Date(`${expirationDate}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86400000);
+  const state: ExpiryState = daysUntilExpiry < 0 || record.status === 'Expired' || record.status === 'Order Expired'
+    ? 'Expired'
+    : daysUntilExpiry <= 7
+      ? 'Expiring in 7 days'
+      : daysUntilExpiry <= 30
+        ? 'Expiring in 30 days'
+        : 'Valid';
+  return {
+    id: `${record.id}-${kind}-expiry`,
+    category: 'Medication',
+    ownerId: record.clientId,
+    ownerName: record.clientName ?? record.clientId,
+    item: kind === 'medication' ? `${record.medicationName} medication expiry` : `${record.medicationName} order expiry`,
+    expirationDate,
+    state,
+    responsibleOwner: record.requiresNurseReview || record.isHighRisk ? 'Nurse' : 'Coordinator',
+    renewalStatus: state === 'Valid' ? 'Verified' : 'Not started',
+    blocksVisits: state === 'Expired' || record.blocksVisit,
+    notificationDraft: `${record.medicationName} ${kind === 'medication' ? 'medication' : 'order'} expiration requires human review before visit readiness is cleared.`,
   };
 }

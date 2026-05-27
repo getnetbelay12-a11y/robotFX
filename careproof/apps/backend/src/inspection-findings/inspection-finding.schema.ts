@@ -29,6 +29,9 @@ export class InspectionFinding {
   @Prop({ type: Types.ObjectId })
   caregiverId!: Types.ObjectId;
 
+  @Prop({ type: Types.ObjectId, default: null })
+  sourceMedicationId?: Types.ObjectId | null;
+
   @Prop()
   clientName!: string;
 
@@ -56,3 +59,4 @@ export class InspectionFinding {
 
 export const InspectionFindingSchema = SchemaFactory.createForClass(InspectionFinding);
 InspectionFindingSchema.index({ agencyId: 1, status: 1 });
+InspectionFindingSchema.index({ agencyId: 1, sourceMedicationId: 1 });
