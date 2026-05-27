@@ -11,7 +11,6 @@ import {
   AiDraftCard,
   AiPanel,
   AiReviewBadge,
-  AiRiskSignalCard,
   AiSuggestionList,
   EditableAiDraft,
 } from './careproof-ai';
@@ -54,7 +53,6 @@ import {
   buildBranchPerformance,
   buildCaregiverSupportRecords,
   buildClientRiskRecords,
-  buildExecutiveTrends,
   buildFamilyCommunicationHealth,
   getOperationalVisitMetrics,
 } from '../lib/management-helpers';
@@ -73,8 +71,6 @@ import {
   completeCanonicalDemoTaskApi,
   generateFamilyUpdateDraftApi,
   generateIncidentTriageApi,
-  generateNextActionsApi,
-  generateRiskSignalsApi,
   getGoLiveChecklistApi,
   getIntegrationsApi,
   getSystemStatusApi,
@@ -751,7 +747,7 @@ const _visitCodeCache: Record<string, string> = {
 };
 let _visitCodeCounter = 1007;
 
-function displayVisitCode(visit: Visit) {
+export function displayVisitCode(visit: Visit) {
   if (_visitCodeCache[visit.id]) return _visitCodeCache[visit.id];
   const code = `V-${_visitCodeCounter++}`;
   _visitCodeCache[visit.id] = code;
@@ -762,9 +758,9 @@ function todayVisitsOnly(visits: Visit[]) {
   return visits.filter((visit) => visit.scheduledDay === 'Today');
 }
 
-type AttentionItem = [label: string, count: number, action: string];
+export type AttentionItem = [label: string, count: number, action: string];
 
-function attentionSummary(visits: Visit[], incidents: Incident[], concerns: FamilyConcern[]): AttentionItem[] {
+export function attentionSummary(visits: Visit[], incidents: Incident[], concerns: FamilyConcern[]): AttentionItem[] {
   const incompleteChecklists = visits.filter((visit) => visit.checkOutTime && !getChecklistProgress(visit).complete);
   const missingNotes = visits.filter((visit) => visit.checkOutTime && !visit.careNote);
   return [
@@ -778,7 +774,7 @@ function attentionSummary(visits: Visit[], incidents: Incident[], concerns: Fami
   ];
 }
 
-function attentionActionLabel(label: string) {
+export function attentionActionLabel(label: string) {
   const labels: Record<string, string> = {
     'Late visit': 'Review late visits',
     'Missed visit': 'Confirm missed visits',
@@ -820,7 +816,7 @@ function downloadCsvFile(filename: string, rows: Array<Array<string | number>>) 
   URL.revokeObjectURL(url);
 }
 
-function useVisitMetrics() {
+export function useVisitMetrics() {
   const { filteredVisits, filteredIncidents, filteredFamilyConcerns, weeklyReports } = useDemoStore();
   const todayVisits = todayVisitsOnly(filteredVisits);
   const statuses = todayVisits.map(getVisitStatus);
@@ -840,7 +836,7 @@ function useVisitMetrics() {
   };
 }
 
-function useReferenceData() {
+export function useReferenceData() {
   const store = useDemoStore();
   return useMemo(
     () => ({
@@ -926,7 +922,7 @@ function useSystemReadiness() {
   return { systemStatus, goLiveChecklist, integrations, loading, apiConnected };
 }
 
-function VisitCard({ visit, href }: { visit: Visit; href: string }) {
+export function VisitCard({ visit, href }: { visit: Visit; href: string }) {
   const { getClient, getCaregiver } = useReferenceData();
   const client = getClient(visit.clientId);
   const caregiver = getCaregiver(visit.caregiverId);
@@ -1056,333 +1052,7 @@ export function PricingPageScreen() {
   );
 }
 
-export function ConsoleDashboardScreen() {
-  const { todayVisits, scheduled, inProgress, completed, late, missed, needsReview, incidents, familyConcerns, weeklyReports } = useVisitMetrics();
-  const { showToast, onboardingChecklist, onboardingProgress, pilotReadiness } = useDemoStore();
-  const { caregivers, getClient, getCaregiver } = useReferenceData();
-  const attention = attentionSummary(todayVisits, incidents, familyConcerns);
-  const [aiActions, setAiActions] = useState<Array<{ priority: string; reason: string; suggestedOwner: string; suggestedDueTime: string; action: string }> | null>(null);
-  const [riskSignals, setRiskSignals] = useState<Array<{ signalTitle: string; whyItMatters: string; affectedClient: string; affectedCaregiver: string; recommendedCoordinatorAction: string; confidence: string }> | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
-  const boardColumns: Array<{ label: string; items: Visit[] }> = [
-    { label: 'Scheduled', items: todayVisits.filter((visit) => getVisitStatus(visit) === 'Scheduled') },
-    { label: 'In Progress', items: todayVisits.filter((visit) => getVisitStatus(visit) === 'In Progress') },
-    { label: 'Completed', items: todayVisits.filter((visit) => getVisitStatus(visit) === 'Completed') },
-    { label: 'Late / Needs Attention', items: todayVisits.filter((visit) => ['Late', 'Needs Review', 'Missed'].includes(getVisitStatus(visit))) },
-  ];
-  const openIncidents = incidents.filter((item) => !['Resolved', 'Closed'].includes(item.status)).length;
-  const openConcerns = familyConcerns.filter((item) => !['Resolved', 'Closed'].includes(item.status)).length;
-  const reportsReady = weeklyReports.filter((item) => item.status === 'Ready').length;
-  const pendingNurseApprovals = nurseApprovals.filter((item) => !['Approved', 'Rejected'].includes(item.status)).length;
-  const highPriorityNurseReviews = nurseApprovals.filter((item) => ['High', 'Critical'].includes(item.priority) && !['Approved', 'Rejected'].includes(item.status)).length;
-  const openInspectionFindings = inspectionFindings.filter((item) => !['Resolved', 'Dismissed'].includes(item.status)).length;
-  const openSocialWorkCases = socialWorkCases.filter((item) => item.status !== 'Closed').length;
-  const medicalBlockers = medicalAvailabilityRecords.filter((item) => item.blocksVisit || ['Missing', 'Expired'].includes(item.status)).length;
-  const expiringBlockers = expirationRecords.filter((item) => item.blocksVisits || ['Expired', 'Missing', 'Blocker', 'Expiring in 7 days'].includes(item.state)).length;
-  const lateTone = (late === 0 ? 'neutral' : 'danger') as 'neutral' | 'danger';
-  const missedTone = (missed === 0 ? 'neutral' : 'danger') as 'neutral' | 'danger';
-  const reviewTone = (needsReview === 0 ? 'neutral' : 'warning') as 'neutral' | 'warning';
-  const incidentTone = (openIncidents === 0 ? 'neutral' : 'warning') as 'neutral' | 'warning';
-  const concernTone = (openConcerns === 0 ? 'neutral' : 'warning') as 'neutral' | 'warning';
-  const activeAttention = attention.filter(([, count]) => count > 0);
-  const defaultNextActions = attention
-    .filter(([, count]) => Number(count) > 0)
-    .slice(0, 4);
-
-  return (
-    <AppShell
-      title="Agency dashboard"
-      subtitle="What needs attention today? Review visit proof, open issues, family concerns, and report-ready records from one operating screen."
-      navItems={consoleLinks}
-    >
-      {onboardingProgress < 100 ? (
-        <div className="dashboardSplit">
-          <DashboardCard title="Onboarding readiness">
-            <div className="readinessHeader">
-              <div>
-                <p className="sectionEyebrow">Setup progress</p>
-                <h3>{onboardingProgress}% complete</h3>
-              </div>
-              <Link className="button primaryButton" href="/console/onboarding">
-                {onboardingProgress >= 60 ? 'Open Setup Checklist' : 'Finish Agency Setup'}
-              </Link>
-            </div>
-            <div className="progressBar"><span style={{ width: `${onboardingProgress}%` }} /></div>
-            <div className="stackGrid compactStack">
-              {onboardingChecklist.map((item) => (
-                <div key={item.id} className="miniSummaryCard miniSummaryTight">
-                  <strong>{item.label}</strong>
-                  <StatusBadge status={item.completed ? 'Completed' : 'Scheduled'} />
-                </div>
-              ))}
-            </div>
-          </DashboardCard>
-          <DashboardCard title="Pilot readiness score">
-            <div className="readinessScoreCard">
-              <strong>{pilotReadiness.score}</strong>
-              <span>{pilotReadiness.status}</span>
-            </div>
-            <ul className="featureList">
-              {pilotReadiness.recommendations.slice(0, 4).map((recommendation) => (
-                <li key={recommendation}>{recommendation}</li>
-              ))}
-            </ul>
-          </DashboardCard>
-        </div>
-      ) : null}
-
-      <div className="statsGrid">
-        <StatCard label="Today's Visits" value={todayVisits.length} href="/console/visits?range=Today" />
-        <StatCard label="Scheduled" value={scheduled} href="/console/visits?status=Scheduled" />
-        <StatCard label="In Progress" value={inProgress} tone="info" href="/console/visits?status=In+Progress" />
-        <StatCard label="Completed" value={completed} tone="positive" href="/console/visits?status=Completed" />
-        <StatCard label="Late" value={late} tone={lateTone} href="/console/visits?status=Late" />
-        <StatCard label="Missed" value={missed} tone={missedTone} href="/console/visits?status=Missed" />
-        <StatCard label="Needs Review" value={needsReview} tone={reviewTone} href="/console/visits?status=Needs+Review" />
-        <StatCard label="Open Incidents" value={openIncidents} tone={incidentTone} href="/console/incidents" />
-        <StatCard label="Family Concerns" value={openConcerns} tone={concernTone} href="/console/family-concerns" />
-        <StatCard label="Reports Ready" value={reportsReady} tone="positive" href="/console/reports" />
-        <StatCard label="Nurse Approvals" value={pendingNurseApprovals} tone={highPriorityNurseReviews ? 'danger' : 'warning'} href="/console/nurse-approvals" />
-        <StatCard label="Inspection Findings" value={openInspectionFindings} tone={openInspectionFindings ? 'warning' : 'neutral'} href="/console/inspection-center" />
-        <StatCard label="Social Work Cases" value={openSocialWorkCases} tone={openSocialWorkCases ? 'warning' : 'neutral'} href="/console/social-work" />
-        <StatCard label="Medical Blockers" value={medicalBlockers} tone={medicalBlockers ? 'danger' : 'neutral'} href="/console/medical-availability" />
-        <StatCard label="Compliance Expiring" value={expiringBlockers} tone={expiringBlockers ? 'danger' : 'neutral'} href="/console/expiration-center" />
-      </div>
-
-      <DashboardCard title="Today’s Risk Board">
-        <div className="riskBoardGrid">
-          {[
-            ['Critical', `${openIncidents + medicalBlockers} critical operational items`, '/console/operations'],
-            ['Needs approval', `${pendingNurseApprovals} nurse or agency approvals pending`, '/console/nurse-approvals'],
-            ['Missing proof', `${todayVisits.filter((visit) => !visit.careNote && visit.checkOutTime).length} visits missing notes after checkout`, '/console/inspection-center'],
-            ['Family waiting', `${openConcerns} family concerns need response`, '/console/family-concerns'],
-            ['Compliance blocker', `${expiringBlockers} expiring or missing compliance items`, '/console/expiration-center'],
-          ].map(([label, body, href]) => (
-            <Link key={label} className="riskBoardCard" href={href}>
-              <StatusBadge status={label} />
-              <strong>{body}</strong>
-              <span>Open next action</span>
-            </Link>
-          ))}
-        </div>
-      </DashboardCard>
-
-      <div className="dashboardSplit">
-        <DashboardCard title="Today's visit board">
-          <div className="kanbanGrid">
-            {boardColumns.map(({ label, items }) => {
-              const columnTone =
-                label === 'Completed'
-                  ? 'kanbanColumn-positive'
-                  : label === 'In Progress'
-                    ? 'kanbanColumn-info'
-                    : label === 'Late / Needs Attention'
-                      ? 'kanbanColumn-danger'
-                      : 'kanbanColumn-neutral';
-              const isAttentionColumn = label === 'Late / Needs Attention';
-              const badgeClass = isAttentionColumn && items.length > 0 ? 'kanbanBadge kanbanBadge-danger' : 'kanbanBadge';
-              return (
-                <div key={label} className={`kanbanColumn ${columnTone}`}>
-                  <div className="kanbanHeader">
-                    <strong>{label}</strong>
-                    <span className={badgeClass}>{items.length}</span>
-                  </div>
-                  {items.length ? (
-                    items.map((visit) => <VisitCard key={visit.id} visit={visit} href={`/console/visits/${visit.id}`} />)
-                  ) : (
-                    <EmptyState title="No visits here" text="No visit proof records are in this stage right now." />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </DashboardCard>
-        <div className="dashboardAsideStack">
-          <DashboardCard title="Suggested Next Actions">
-            <div className="actionStack">
-              <AiActionButton
-                label="Refresh Suggestions"
-                onClick={async () => {
-                  setAiLoading(true);
-                  const queue = todayVisits
-                    .filter((visit) => ['Late', 'Missed', 'Needs Review'].includes(getVisitStatus(visit)))
-                    .map((visit) => ({
-                      id: visit.id,
-                      type: getVisitStatus(visit).toLowerCase().replace(/\s+/g, '_'),
-                      trigger: getVisitAlert(visit) ?? 'Visit needs coordinator review.',
-                      recommendedAction: 'Review visit',
-                      clientName: getClient(visit.clientId)?.name,
-                      caregiverName: getCaregiver(visit.caregiverId)?.name,
-                    }));
-                  const result = await generateNextActionsApi({ attentionQueue: queue });
-                  setAiActions((result as { prioritizedActions?: Array<{ priority: string; reason: string; suggestedOwner: string; suggestedDueTime: string; action: string }> }).prioritizedActions ?? []);
-                  setAiLoading(false);
-                  showToast('AI next actions refreshed.');
-                }}
-                disabled={aiLoading}
-              />
-              <AiDisclaimer>AI-assisted draft. Human review required before acting on escalations.</AiDisclaimer>
-            </div>
-            {aiActions?.length ? (
-              <div className="stackGrid">
-                {aiActions.map((item) => (
-                  <div key={`${item.action}-${item.reason}`} className="miniSummaryCard">
-                    <div className="aiRiskSignalTop">
-                      <strong>{item.action}</strong>
-                      <AiReviewBadge label={item.priority} />
-                    </div>
-                    <p>{item.reason}</p>
-                    <p><strong>Owner:</strong> {item.suggestedOwner} · <strong>Due:</strong> {item.suggestedDueTime}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="stackGrid">
-                {defaultNextActions.length ? (
-                  defaultNextActions.map(([label, count, action]) => (
-                    <div key={label} className="miniSummaryCard">
-                      <div className="aiRiskSignalTop">
-                        <strong>{attentionActionLabel(label)}</strong>
-                        <StatusBadge status={Number(count) > 1 ? 'High' : 'Medium'} />
-                      </div>
-                      <p>{count} item{Number(count) === 1 ? '' : 's'} need action. {action}.</p>
-                      <p><strong>Owner:</strong> Coordinator · <strong>Due:</strong> Today</p>
-                    </div>
-                  ))
-                ) : (
-                  <EmptyState title="No urgent actions right now" text="Refresh suggestions if you want an AI-assisted draft of coordinator follow-up actions." />
-                )}
-              </div>
-            )}
-          </DashboardCard>
-          <DashboardCard title="Attention Queue">
-            {activeAttention.length ? (
-              <div className="alertList">
-                {activeAttention.map(([label, count, action]) => {
-                const href =
-                  label === 'Open Incidents' ? '/console/incidents' :
-                  label === 'Open family concerns' ? '/console/family-concerns' :
-                  label === 'Late visit' ? '/console/visits?status=Late' :
-                  label === 'Missed visit' ? '/console/visits?status=Missed' :
-                  label === 'Checkout missing' ? '/console/visits?status=Needs+Review' :
-                  label === 'Incomplete checklists' ? '/console/visits?status=Needs+Review' :
-                  label === 'Missing notes' ? '/console/visits?status=Needs+Review' :
-                  '/console/visits';
-                const isUrgent = typeof count === 'number' && count > 0;
-                return (
-                  <div key={label} className={`alertRow${isUrgent ? ' alertRow-urgent' : ''}`}>
-                    <div>
-                      <strong>{label}</strong>
-                      <p>{count} items · {action}</p>
-                    </div>
-                    <Link className="textAction" href={href}>
-                      {attentionActionLabel(label)}
-                    </Link>
-                  </div>
-                );
-                })}
-              </div>
-            ) : (
-              <EmptyState title="No open attention items" text="Late visits, incidents, family concerns, missing notes, and checklist gaps will appear here." />
-            )}
-          </DashboardCard>
-          <DashboardCard title="Caregiver Performance Snapshot">
-            <DataTable
-              columns={['Caregiver', 'Assigned', 'Completed', 'On-time rate', 'Open issues']}
-              rows={caregivers.map((caregiver) => [
-                caregiver.name,
-                caregiver.assignedVisits,
-                caregiver.completedVisits,
-                `${caregiver.onTimeRate}%`,
-                caregiver.openIssues,
-              ])}
-            />
-          </DashboardCard>
-          <DashboardCard title="Recent Activity Timeline">
-            <Timeline
-              items={[
-                ...todayVisits
-                  .filter((v) => v.checkInTime)
-                  .map((v) => ({
-                    label: `${getCaregiver(v.caregiverId)?.name ?? 'Caregiver'} checked in — ${getClient(v.clientId)?.name ?? 'client'}`,
-                    time: v.checkInTime ?? '',
-                    actor: 'Caregiver',
-                  })),
-                ...todayVisits
-                  .filter((v) => v.checkOutTime)
-                  .map((v) => ({
-                    label: `${displayVisitCode(v)} completed — ${getClient(v.clientId)?.name ?? 'client'}`,
-                    time: v.checkOutTime ?? '',
-                    actor: 'Caregiver',
-                  })),
-                ...incidents
-                  .slice(0, 2)
-                  .map((inc) => ({
-                    label: `Incident: ${inc.type}`,
-                    time: inc.createdAt,
-                    actor: 'Staff',
-                  })),
-                ...familyConcerns
-                  .filter((c) => c.status === 'Closed' || c.status === 'Resolved')
-                  .slice(0, 1)
-                  .map((c) => ({
-                    label: `Concern resolved — ${c.type}`,
-                    time: c.responseDue ?? 'Recently',
-                    actor: 'Coordinator',
-                  })),
-              ]
-                .filter((item) => item.time)
-                .slice(0, 6)}
-            />
-          </DashboardCard>
-          <DashboardCard title="Risk Signals">
-            <div className="actionStack">
-              <AiActionButton
-                label="Refresh Risk Signals"
-                onClick={async () => {
-                  const records = caregivers.map((caregiver) => {
-                    const caregiverVisits = todayVisits.filter((visit) => visit.caregiverId === caregiver.id);
-                    return {
-                      clientId: caregiverVisits[0]?.clientId ?? caregiver.id,
-                      clientName: caregiverVisits[0] ? getClient(caregiverVisits[0].clientId)?.name : undefined,
-                      caregiverId: caregiver.id,
-                      caregiverName: caregiver.name,
-                      lateVisits: caregiverVisits.filter((visit) => getVisitStatus(visit) === 'Late').length,
-                      incompleteTasks: caregiverVisits.filter((visit) => !getChecklistProgress(visit).complete).length,
-                      concerns: familyConcerns.filter((concern) => caregiverVisits.some((visit) => visit.clientId === concern.clientId)).length,
-                      incidents: incidents.filter((incident) => caregiverVisits.some((visit) => visit.clientId === incident.clientId)).length,
-                      missingNotes: caregiverVisits.filter((visit) => !visit.careNote).length,
-                      checkoutMissing: caregiverVisits.filter(isCheckoutMissing).length,
-                    };
-                  });
-                  const result = await generateRiskSignalsApi({ records });
-                  setRiskSignals((result as { riskSignals?: Array<{ signalTitle: string; whyItMatters: string; affectedClient: string; affectedCaregiver: string; recommendedCoordinatorAction: string; confidence: string }> }).riskSignals ?? []);
-                  showToast('Risk signals refreshed.');
-                }}
-              />
-              <AiDisclaimer>Operational signals only. Not medical advice.</AiDisclaimer>
-            </div>
-            {riskSignals?.length ? (
-              <div className="stackGrid">
-                {riskSignals.map((signal) => (
-                  <AiRiskSignalCard
-                    key={`${signal.signalTitle}-${signal.affectedClient}`}
-                    title={`${signal.signalTitle} · ${signal.affectedClient}`}
-                    body={signal.whyItMatters}
-                    confidence={signal.confidence}
-                    action={signal.recommendedCoordinatorAction}
-                  />
-                ))}
-              </div>
-            ) : (
-              <EmptyState title="No risk signals yet" text="Refresh risk signals to review operational patterns across visits." />
-            )}
-          </DashboardCard>
-        </div>
-      </div>
-    </AppShell>
-  );
-}
+export { ConsoleDashboardScreen } from './features/dashboard/console-dashboard-screen';
 
 export function VisitsScreen() {
   const { visits, incidents, showToast } = useDemoStore();
@@ -4250,210 +3920,7 @@ export function OperationsScreen() {
   );
 }
 
-export function ExecutiveDashboardScreen() {
-  const { filteredVisits, filteredIncidents, filteredFamilyConcerns, weeklyReports } = useDemoStore();
-  const { branches: agencyBranches, getClient } = useReferenceData();
-  const health = buildAgencyHealthScore({ visits: filteredVisits, incidents: filteredIncidents, concerns: filteredFamilyConcerns, reports: weeklyReports });
-  const branchPerformance = buildBranchPerformance({
-    branches: agencyBranches,
-    visits: filteredVisits,
-    incidents: filteredIncidents,
-    concerns: filteredFamilyConcerns,
-  });
-  const risks = buildClientRiskRecords({
-    clients,
-    visits: filteredVisits,
-    incidents: filteredIncidents,
-    concerns: filteredFamilyConcerns,
-    reports: weeklyReports,
-  }).slice(0, 5);
-  const familyHealth = buildFamilyCommunicationHealth({
-    concerns: filteredFamilyConcerns,
-    reports: weeklyReports,
-    visits: filteredVisits,
-  });
-  const support = buildCaregiverSupportRecords({
-    caregivers,
-    visits: filteredVisits,
-    concerns: filteredFamilyConcerns,
-  });
-  const operationalMetrics = getOperationalVisitMetrics(filteredVisits);
-  const completionRate = `${operationalMetrics.completionRate}%`;
-  const onTimeRate = filteredVisits.length ? `${Math.round((filteredVisits.filter((visit) => !['Late', 'Missed'].includes(getVisitDisplayStatus(visit))).length / filteredVisits.length) * 100)}%` : '0%';
-  const concernResponseTime = familyHealth.averageResponseTime;
-  const weeklyReportsSent = weeklyReports.filter((report) => report.status === 'Sent').length;
-  const trends = buildExecutiveTrends({ completionRate, onTimeRate, concernResponseTime, weeklyReportsSent });
-  const missedVisits = filteredVisits.filter((visit) => getVisitDisplayStatus(visit) === 'Missed').length;
-  const lateVisits = filteredVisits.filter((visit) => getVisitDisplayStatus(visit) === 'Late').length;
-  const openIncidents = filteredIncidents.filter((incident) => !['Resolved', 'Closed'].includes(incident.status)).length;
-  const openConcerns = filteredFamilyConcerns.filter((concern) => !['Resolved', 'Closed'].includes(concern.status)).length;
-  const highRiskClients = risks.filter((item) => item.riskLevel === 'High').length;
-  const caregiversNeedingSupport = support.filter((item) => item.supportSignal !== 'No urgent support signal').length;
-  const readyReports = weeklyReports.filter((report) => report.status === 'Ready').length;
-  const ownerBrief = [
-    {
-      label: 'Reliability',
-      value: `${operationalMetrics.completedCount}/${operationalMetrics.closedCount || 0}`,
-      detail: 'closed visits have complete proof',
-      href: '/console/operations',
-    },
-    {
-      label: 'Family trust',
-      value: openConcerns,
-      detail: 'open family concerns need response',
-      href: '/console/family-concerns',
-    },
-    {
-      label: 'Records ready',
-      value: `${weeklyReportsSent} sent · ${readyReports} ready`,
-      detail: 'weekly reports are available for review',
-      href: '/console/reports',
-    },
-  ];
-  const ownerActions = [
-    {
-      title: 'Respond to open family concerns',
-      detail: `${openConcerns} concern${openConcerns === 1 ? '' : 's'} still need a family-facing response or resolution.`,
-      href: '/console/family-concerns',
-      status: openConcerns ? 'Needs Review' : 'Completed',
-    },
-    {
-      title: 'Review incident follow-up',
-      detail: `${openIncidents} incident${openIncidents === 1 ? '' : 's'} remain open across the current demo period.`,
-      href: '/console/incidents',
-      status: openIncidents ? 'Needs Review' : 'Completed',
-    },
-    {
-      title: 'Send ready weekly reports',
-      detail: `${readyReports} report${readyReports === 1 ? '' : 's'} are ready but not yet sent.`,
-      href: '/console/reports',
-      status: readyReports ? 'Ready' : 'Completed',
-    },
-    {
-      title: 'Check caregiver support signals',
-      detail: `${caregiversNeedingSupport} caregiver${caregiversNeedingSupport === 1 ? '' : 's'} show documentation or schedule support needs.`,
-      href: '/console/caregiver-support',
-      status: caregiversNeedingSupport ? 'Needs Review' : 'Completed',
-    },
-  ];
-
-  return (
-    <AppShell title="Executive dashboard" subtitle="Is the agency operating reliably? Review service reliability, family communication health, branch performance, and owner follow-up from one view." navItems={consoleLinks}>
-      <DashboardCard title="Owner brief">
-        <div className="ownerBriefGrid">
-          {ownerBrief.map((item) => (
-            <Link key={item.label} href={item.href} className="ownerBriefCard">
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
-              <p>{item.detail}</p>
-            </Link>
-          ))}
-        </div>
-      </DashboardCard>
-
-      <div className="statsGrid">
-        <StatCard label="Total visits this week" value={filteredVisits.length} />
-        <StatCard label="Visit completion rate" value={completionRate} tone="positive" />
-        <StatCard label="On-time check-in rate" value={onTimeRate} tone="info" />
-        <StatCard label="Missed visits" value={missedVisits} tone="danger" />
-        <StatCard label="Late visits" value={lateVisits} tone="warning" />
-        <StatCard label="Open incidents" value={openIncidents} tone="warning" />
-        <StatCard label="Open family concerns" value={openConcerns} tone="warning" />
-        <StatCard label="Avg concern response time" value={concernResponseTime} tone="info" />
-        <StatCard label="Weekly reports sent" value={weeklyReportsSent} tone="positive" />
-        <StatCard label="Clients at risk" value={highRiskClients} tone="warning" />
-        <StatCard label="Caregivers needing support" value={caregiversNeedingSupport} tone="warning" />
-      </div>
-
-      <div className="dashboardSplit">
-        <DashboardCard title="Agency health score">
-          <div className="executiveHealthLayout">
-            <div className="readinessScoreCard">
-              <strong>{health.score}</strong>
-              <span>{health.status}</span>
-            </div>
-            <div className="miniSummaryCard">
-              <strong>What drives the score</strong>
-              <p>Visit proof, late or missed visits, open incidents, family concerns, and weekly report readiness.</p>
-            </div>
-          </div>
-          <ul className="featureList">
-            {health.drivers.map((driver) => <li key={driver}>{driver}</li>)}
-          </ul>
-        </DashboardCard>
-        <DashboardCard title="Trend indicators">
-          <div className="stackGrid">
-            {trends.map((trend) => (
-              <div key={trend.label} className="miniSummaryCard">
-                <div className="aiRiskSignalTop">
-                  <strong>{trend.label}</strong>
-                  <StatusBadge status={trend.direction === 'up' ? 'Completed' : 'Needs Review'} />
-                </div>
-                <p><strong>{trend.value}</strong> · {trend.changeLabel}</p>
-              </div>
-            ))}
-          </div>
-        </DashboardCard>
-      </div>
-
-      <div className="dashboardSplit">
-        <DashboardCard title="Top risks this week">
-          <div className="stackGrid">
-            {risks.map((risk) => (
-              <div key={risk.clientId} className="miniSummaryCard">
-                <div className="aiRiskSignalTop">
-                  <strong>{getClient(risk.clientId)?.name}</strong>
-                  <StatusBadge status={risk.riskLevel} />
-                </div>
-                <p>{risk.reason}</p>
-                <p><strong>Recommended:</strong> {risk.recommendedAction}</p>
-                <Link className="textAction" href={`/console/clients/${risk.clientId}`}>Open client record</Link>
-              </div>
-            ))}
-          </div>
-        </DashboardCard>
-        <DashboardCard title="Owner next actions">
-          <div className="stackGrid">
-            {ownerActions.map((item) => (
-              <div key={item.title} className="miniSummaryCard">
-                <div className="aiRiskSignalTop">
-                  <strong>{item.title}</strong>
-                  <StatusBadge status={item.status} />
-                </div>
-                <p>{item.detail}</p>
-                <Link className="textAction" href={item.href}>Open workflow</Link>
-              </div>
-            ))}
-          </div>
-        </DashboardCard>
-      </div>
-
-      <DashboardCard title="Branch and team performance">
-        <DataTable
-          columns={['Branch', 'Visits completed', 'Late / missed', 'Open incidents', 'Open concerns', 'Score', 'Action']}
-          rows={branchPerformance.map((branch) => [
-            branch.name,
-            branch.visitsCompleted,
-            branch.lateOrMissed,
-            branch.openIncidents,
-            branch.openConcerns,
-            `${branch.score} · ${branch.status}`,
-            <Link key="action" className="textAction" href={`/console/branches/${branch.branchId}`}>View branch</Link>,
-          ])}
-        />
-      </DashboardCard>
-
-      <DashboardCard title="Management report actions">
-        <div className="inlineActions">
-          <Link className="button secondaryButton" href="/console/reports">Generate executive weekly summary</Link>
-          <Link className="button secondaryButton" href="/console/client-risk">Review client risk</Link>
-          <Link className="button secondaryButton" href="/console/billing">Open billing readiness</Link>
-          <Link className="button secondaryButton" href="/console/caregiver-support">Review caregiver support</Link>
-        </div>
-      </DashboardCard>
-    </AppShell>
-  );
-}
+export { ExecutiveDashboardScreen } from './features/executive-dashboard/executive-dashboard-screen';
 
 export function BranchesScreen() {
   const { branches: agencyBranches, users } = useReferenceData();
