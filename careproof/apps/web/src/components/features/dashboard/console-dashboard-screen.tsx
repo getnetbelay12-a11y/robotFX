@@ -23,6 +23,7 @@ import {
   expirationRecords,
   inspectionFindings,
   medicalAvailabilityRecords,
+  medicationRecords,
   nurseApprovals,
   socialWorkCases,
 } from '../../../data/demoCareProofData';
@@ -62,6 +63,85 @@ export function ConsoleDashboardScreen() {
   const openSocialWorkCases = socialWorkCases.filter((item) => item.status !== 'Closed').length;
   const medicalBlockers = medicalAvailabilityRecords.filter((item) => item.blocksVisit || ['Missing', 'Expired'].includes(item.status)).length;
   const expiringBlockers = expirationRecords.filter((item) => item.blocksVisits || ['Expired', 'Missing', 'Blocker', 'Expiring in 7 days'].includes(item.state)).length;
+  const medicationRisks = medicationRecords.filter((item) => item.blocksVisit || ['Low Stock', 'Missing', 'Expired', 'Order Expired', 'Needs Refill', 'Needs Nurse Review'].includes(item.status));
+  const visitBlockers = todayVisits.filter((visit) => ['Late', 'Missed', 'Needs Review'].includes(getVisitStatus(visit)))
+    .map((visit) => ({
+      id: `visit-${visit.id}`,
+      client: getClient(visit.clientId)?.name ?? visit.clientId,
+      visit: displayVisitCode(visit),
+      risk: getVisitStatus(visit),
+      blocker: getVisitAlert(visit) ?? 'Visit requires coordinator review',
+      owner: getCaregiver(visit.caregiverId)?.name ?? 'Caregiver',
+      due: visit.endLabel,
+      nextAction: 'Review visit proof and contact caregiver if needed.',
+      href: `/console/visits/${visit.id}`,
+    }));
+  const medicationRows = medicationRisks.map((item) => ({
+    id: `med-${item.id}`,
+    client: item.clientName ?? getClient(item.clientId)?.name ?? item.clientId,
+    visit: item.visitId ? displayVisitCode(todayVisits.find((visit) => visit.id === item.visitId) ?? { id: item.visitId } as Visit) : 'Client profile',
+    risk: item.status,
+    blocker: `${item.medicationName} ${item.strength}`,
+    owner: item.requiresNurseReview || item.isHighRisk ? 'Nurse' : 'Coordinator',
+    due: item.status === 'Expired' ? item.medicationExpiryDate : item.status === 'Order Expired' ? item.orderExpiryDate : item.nextReconciliationDue,
+    nextAction: item.nextAction,
+    href: '/console/medications',
+  }));
+  const approvalRows = nurseApprovals
+    .filter((item) => !['Approved', 'Rejected'].includes(item.status))
+    .map((item) => ({
+      id: `approval-${item.id}`,
+      client: getClient(item.clientId)?.name ?? item.clientId,
+      visit: item.visitId ? displayVisitCode(todayVisits.find((visit) => visit.id === item.visitId) ?? { id: item.visitId } as Visit) : 'Not linked',
+      risk: item.priority,
+      blocker: item.approvalType,
+      owner: 'Nurse',
+      due: item.submittedTime,
+      nextAction: item.blocksFamilyVisibility ? 'Review before family update becomes visible.' : 'Review and record decision.',
+      href: '/console/nurse-approvals',
+    }));
+  const inspectionRows = inspectionFindings
+    .filter((item) => !['Resolved', 'Dismissed'].includes(item.status))
+    .map((item) => ({
+      id: `finding-${item.id}`,
+      client: item.clientName ?? (item.clientId ? getClient(item.clientId)?.name : undefined) ?? item.relatedType,
+      visit: item.visitId ? displayVisitCode(todayVisits.find((visit) => visit.id === item.visitId) ?? { id: item.visitId } as Visit) : item.relatedType,
+      risk: item.severity,
+      blocker: item.title,
+      owner: item.owner || 'Coordinator',
+      due: item.openedAt,
+      nextAction: item.recommendedAction,
+      href: '/console/inspection-center',
+    }));
+  const expirationRows = expirationRecords
+    .filter((item) => item.blocksVisits || ['Expired', 'Missing', 'Blocker', 'Expiring in 7 days', 'Expiring in 30 days'].includes(item.state))
+    .map((item) => ({
+      id: `expiry-${item.id}`,
+      client: item.ownerName,
+      visit: item.category,
+      risk: item.state,
+      blocker: item.item,
+      owner: item.responsibleOwner,
+      due: item.expirationDate ?? 'Missing',
+      nextAction: item.notificationDraft || 'Start renewal and verify before scheduling expands.',
+      href: '/console/expiration-center',
+    }));
+  const familyRows = familyConcerns
+    .filter((item) => !['Resolved', 'Closed'].includes(item.status))
+    .map((item) => ({
+      id: `family-${item.id}`,
+      client: getClient(item.clientId)?.name ?? item.clientId,
+      visit: 'Family portal',
+      risk: item.priority,
+      blocker: item.type,
+      owner: item.assignedOwner,
+      due: item.responseDue,
+      nextAction: 'Draft family-safe response and separate internal notes.',
+      href: '/console/family-concerns',
+    }));
+  const safetyRows = [...visitBlockers, ...medicationRows, ...approvalRows, ...inspectionRows, ...expirationRows, ...familyRows]
+    .slice(0, 10);
+  const familyWaiting = familyRows.length + nurseApprovals.filter((item) => item.blocksFamilyVisibility && !['Approved', 'Rejected'].includes(item.status)).length;
   const lateTone = (late === 0 ? 'neutral' : 'danger') as 'neutral' | 'danger';
   const missedTone = (missed === 0 ? 'neutral' : 'danger') as 'neutral' | 'danger';
   const reviewTone = (needsReview === 0 ? 'neutral' : 'warning') as 'neutral' | 'warning';
@@ -129,16 +209,99 @@ export function ConsoleDashboardScreen() {
         <StatCard label="Inspection Findings" value={openInspectionFindings} tone={openInspectionFindings ? 'warning' : 'neutral'} href="/console/inspection-center" />
         <StatCard label="Social Work Cases" value={openSocialWorkCases} tone={openSocialWorkCases ? 'warning' : 'neutral'} href="/console/social-work" />
         <StatCard label="Medical Blockers" value={medicalBlockers} tone={medicalBlockers ? 'danger' : 'neutral'} href="/console/medical-availability" />
+        <StatCard label="Medication Risks" value={medicationRisks.length} tone={medicationRisks.length ? 'danger' : 'neutral'} href="/console/medications" />
         <StatCard label="Compliance Expiring" value={expiringBlockers} tone={expiringBlockers ? 'danger' : 'neutral'} href="/console/expiration-center" />
       </div>
 
-      <DashboardCard title="Today’s Risk Board">
+      <DashboardCard title="Today Safety Board">
+        <div className="statsGrid proofStatsGrid">
+          <StatCard label="Unsafe today" value={safetyRows.length} tone={safetyRows.length ? 'danger' : 'positive'} />
+          <StatCard label="Visits blocked" value={visitBlockers.length + medicalBlockers} tone={visitBlockers.length + medicalBlockers ? 'danger' : 'positive'} href="/console/operations" />
+          <StatCard label="Medications expired / low" value={medicationRisks.filter((item) => ['Expired', 'Low Stock', 'Missing', 'Order Expired'].includes(item.status)).length} tone={medicationRisks.length ? 'danger' : 'positive'} href="/console/medications" />
+          <StatCard label="Family waiting" value={familyWaiting} tone={familyWaiting ? 'warning' : 'positive'} href="/console/family-health" />
+        </div>
+        <DataTable
+          columns={['Client', 'Visit', 'Risk', 'Blocker', 'Owner', 'Due', 'Next Action']}
+          rows={safetyRows.map((item) => [
+            item.client,
+            item.visit,
+            <StatusBadge key="risk" status={item.risk} />,
+            item.blocker,
+            item.owner,
+            item.due,
+            <Link key="action" className="textAction" href={item.href}>{item.nextAction}</Link>,
+          ])}
+        />
+      </DashboardCard>
+
+      <div className="cardGridThree">
+        <DashboardCard title="Medication Risk">
+          <ul className="featureList">
+            <li>{medicationRisks.filter((item) => item.status === 'Expired' || item.status === 'Order Expired').length} expired medication or order blockers</li>
+            <li>{medicationRisks.filter((item) => item.status === 'Low Stock' || item.status === 'Missing').length} low-stock or missing medication blockers</li>
+            <li>{medicationRisks.filter((item) => item.isHighRisk || item.requiresNurseReview).length} high-risk nurse review items</li>
+          </ul>
+          <Link className="button secondaryButton" href="/console/medications">Open medication queue</Link>
+        </DashboardCard>
+        <DashboardCard title="Visit Blockers">
+          <ul className="featureList">
+            <li>{visitBlockers.length} late, missed, or review-required visits</li>
+            <li>{medicalAvailabilityRecords.filter((item) => item.blocksVisit).length} medical availability blockers</li>
+            <li>{todayVisits.filter((visit) => !visit.careNote && visit.checkOutTime).length} checked-out visits missing notes</li>
+          </ul>
+          <Link className="button secondaryButton" href="/console/operations">Open operations</Link>
+        </DashboardCard>
+        <DashboardCard title="Nurse Approval Queue">
+          <ul className="featureList">
+            {approvalRows.slice(0, 4).map((item) => (
+              <li key={item.id}>{item.client}: {item.blocker} · {item.risk}</li>
+            ))}
+            {!approvalRows.length ? <li>No nurse approvals waiting.</li> : null}
+          </ul>
+          <Link className="button secondaryButton" href="/console/nurse-approvals">Open approvals</Link>
+        </DashboardCard>
+      </div>
+
+      <div className="cardGridThree">
+        <DashboardCard title="Inspection Findings Preview">
+          <ul className="featureList">
+            {inspectionRows.slice(0, 4).map((item) => (
+              <li key={item.id}>{item.client}: {item.blocker}</li>
+            ))}
+            {!inspectionRows.length ? <li>No open inspection findings.</li> : null}
+          </ul>
+          <Link className="button secondaryButton" href="/console/inspection-center">Open findings</Link>
+        </DashboardCard>
+        <DashboardCard title="Expiration / Compliance Preview">
+          <ul className="featureList">
+            {expirationRows.slice(0, 4).map((item) => (
+              <li key={item.id}>{item.client}: {item.blocker} · {item.risk}</li>
+            ))}
+            {!expirationRows.length ? <li>No compliance expirations blocking readiness.</li> : null}
+          </ul>
+          <Link className="button secondaryButton" href="/console/expiration-center">Open expiration center</Link>
+        </DashboardCard>
+        <DashboardCard title="Family Waiting Preview">
+          <ul className="featureList">
+            {familyRows.slice(0, 4).map((item) => (
+              <li key={item.id}>{item.client}: {item.blocker} due {item.due}</li>
+            ))}
+            {approvalRows.filter((item) => item.nextAction.includes('family update')).slice(0, 2).map((item) => (
+              <li key={`${item.id}-family`}>{item.client}: family update blocked by nurse approval</li>
+            ))}
+            {!familyRows.length && !approvalRows.some((item) => item.nextAction.includes('family update')) ? <li>No family updates waiting.</li> : null}
+          </ul>
+          <Link className="button secondaryButton" href="/console/family-health">Open family health</Link>
+        </DashboardCard>
+      </div>
+
+      <DashboardCard title="Operational Risk Board">
         <div className="riskBoardGrid">
           {[
-            ['Critical', `${openIncidents + medicalBlockers} critical operational items`, '/console/operations'],
+            ['Critical', `${openIncidents + medicalBlockers + medicationRisks.filter((item) => ['Expired', 'Missing', 'Order Expired', 'Needs Nurse Review'].includes(item.status)).length} critical operational items`, '/console/operations'],
             ['Needs approval', `${pendingNurseApprovals} nurse or agency approvals pending`, '/console/nurse-approvals'],
             ['Missing proof', `${todayVisits.filter((visit) => !visit.careNote && visit.checkOutTime).length} visits missing notes after checkout`, '/console/inspection-center'],
-            ['Family waiting', `${openConcerns} family concerns need response`, '/console/family-concerns'],
+            ['Family waiting', `${familyWaiting} family updates or concerns need response`, '/console/family-concerns'],
             ['Compliance blocker', `${expiringBlockers} expiring or missing compliance items`, '/console/expiration-center'],
           ].map(([label, body, href]) => (
             <Link key={label} className="riskBoardCard" href={href}>
