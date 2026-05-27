@@ -4316,3 +4316,99 @@ body:has(.appShell) {
 .tableRowHigh strong {
   color: var(--warning);
 }
+
+@media (max-width: 640px) {
+  .appShell,
+  .appMain,
+  .dashboardCard,
+  .dataTableWrap,
+  .statsGrid,
+  .dashboardSplit,
+  .cardGridThree {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .appShell,
+  .appShell:not(.appShell-mobile) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .dataTableWrap {
+    overflow-x: auto;
+  }
+
+  .dashboardSplit,
+  .kanbanGrid,
+  .dashboardAsideStack,
+  .riskBoardGrid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .dataTable,
+  .dashboardSplit .dataTable {
+    min-width: 0;
+    table-layout: fixed;
+  }
+
+  .dataTable th,
+  .dataTable td {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    padding: 6px 4px;
+    font-size: 0.68rem;
+  }
+
+  .dataTable td .textAction,
+  .dataTable td .button,
+  .dataTable td .secondaryButton {
+    white-space: normal;
+    max-width: 100%;
+    min-width: 0;
+    padding: 5px 3px;
+    font-size: 0.66rem;
+  }
+
+  .statusBadge {
+    white-space: normal;
+    text-align: center;
+  }
+
+  .appTopbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .topbarActions {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .topbarActions > *,
+  .topbarActions .demoField,
+  .topbarActions .button,
+  .topbarActions .topbarAlertPill {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .goldenPathRail {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .goldenPathRail a {
+    min-width: 0;
+  }
+
+  .demoModeBanner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .demoModeBanner .textAction {
+    justify-self: start;
+    white-space: normal;
+  }
+}
