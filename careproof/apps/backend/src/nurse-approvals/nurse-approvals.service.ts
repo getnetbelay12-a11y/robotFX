@@ -7,7 +7,7 @@ import { DecideNurseApprovalDto } from './dto/decide-nurse-approval.dto';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/types';
 import { requirePermission } from '../auth/permissions';
-import { canAccessNurseApproval } from '../auth/scope';
+import { canAccessNurseApproval, requireBranchScope } from '../auth/scope';
 import { UserRole } from '../users/user.schema';
 
 @Injectable()
@@ -34,6 +34,9 @@ export class NurseApprovalsService {
         { reviewedBy: new Types.ObjectId(actor.sub) },
       ];
     }
+    if (actor.branchId) {
+      filter.branchId = new Types.ObjectId(actor.branchId);
+    }
     return this.model.find(filter).sort({ createdAt: -1 }).lean();
   }
 
@@ -43,6 +46,7 @@ export class NurseApprovalsService {
       ...dto,
       visitId: new Types.ObjectId(dto.visitId),
       caregiverId: dto.caregiverId ? new Types.ObjectId(dto.caregiverId) : null,
+      branchId: dto.branchId ? new Types.ObjectId(dto.branchId) : actor.branchId ? new Types.ObjectId(actor.branchId) : undefined,
       agencyId: new Types.ObjectId(actor.agencyId),
       status: 'pending_review',
     });
@@ -62,6 +66,7 @@ export class NurseApprovalsService {
       .findOne({ _id: new Types.ObjectId(id), agencyId: new Types.ObjectId(actor.agencyId), deletedAt: null })
       .lean();
     if (!doc) throw new NotFoundException('Nurse approval not found');
+    requireBranchScope(doc.branchId, actor);
     if (!canAccessNurseApproval(actor, doc.caregiverId, doc.reviewedBy)) {
       throw new ForbiddenException('You do not have access to this nurse approval');
     }
@@ -81,6 +86,7 @@ export class NurseApprovalsService {
       { new: true },
     );
     if (!doc) throw new NotFoundException('Nurse approval not found');
+    requireBranchScope(doc.branchId, actor);
     await this.auditService.log({
       agencyId: new Types.ObjectId(actor.agencyId),
       actorUserId: new Types.ObjectId(actor.sub),

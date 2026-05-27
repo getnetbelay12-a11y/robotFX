@@ -8,6 +8,9 @@ export class InspectionFinding {
   @Prop({ type: Types.ObjectId, required: true, index: true })
   agencyId!: Types.ObjectId;
 
+  @Prop({ type: Types.ObjectId, index: true })
+  branchId!: Types.ObjectId;
+
   @Prop({ type: Types.ObjectId, required: true })
   ruleId!: Types.ObjectId;
 

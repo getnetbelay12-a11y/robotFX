@@ -10,6 +10,10 @@ export class CreateSocialWorkCaseDto {
 
   @IsMongoId()
   @IsOptional()
+  branchId?: string;
+
+  @IsMongoId()
+  @IsOptional()
   linkedConcernId?: string;
 
   @IsString()

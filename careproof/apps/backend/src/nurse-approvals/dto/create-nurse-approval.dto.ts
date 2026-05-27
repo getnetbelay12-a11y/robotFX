@@ -8,6 +8,10 @@ export class CreateNurseApprovalDto {
   @IsOptional()
   caregiverId?: string;
 
+  @IsMongoId()
+  @IsOptional()
+  branchId?: string;
+
   @IsString()
   clientName!: string;
 

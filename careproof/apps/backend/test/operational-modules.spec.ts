@@ -20,6 +20,7 @@ describe('Operational modules', () => {
   let agencyId: string;
   let adminActor: AuthUser;
   let nurseApprovalId: string;
+  let otherBranchId: string;
   let inspectionFindingId: string;
   let socialWorkCaseId: string;
   let intakeRecordId: string;
@@ -47,10 +48,15 @@ describe('Operational modules', () => {
       email: 'owner@careproof.demo',
     };
 
-    nurseApprovalId = (await connection.collection('nurseApprovals').findOne({ agencyId: new Types.ObjectId(agencyId) }))!._id.toString();
-    inspectionFindingId = (await connection.collection('inspectionFindings').findOne({ agencyId: new Types.ObjectId(agencyId) }))!._id.toString();
-    socialWorkCaseId = (await connection.collection('socialWorkCases').findOne({ agencyId: new Types.ObjectId(agencyId) }))!._id.toString();
-    intakeRecordId = (await connection.collection('intakeRecords').findOne({ agencyId: new Types.ObjectId(agencyId) }))!._id.toString();
+    const nurseApproval = (await connection.collection('nurseApprovals').findOne({ agencyId: new Types.ObjectId(agencyId) }))!;
+    nurseApprovalId = nurseApproval._id.toString();
+    otherBranchId = (await connection.collection('intakeRecords').findOne({
+      agencyId: new Types.ObjectId(agencyId),
+      branchId: { $ne: nurseApproval.branchId },
+    }))!.branchId.toString();
+    inspectionFindingId = (await connection.collection('inspectionFindings').findOne({ agencyId: new Types.ObjectId(agencyId), branchId: nurseApproval.branchId }))!._id.toString();
+    socialWorkCaseId = (await connection.collection('socialWorkCases').findOne({ agencyId: new Types.ObjectId(agencyId), branchId: nurseApproval.branchId }))!._id.toString();
+    intakeRecordId = (await connection.collection('intakeRecords').findOne({ agencyId: new Types.ObjectId(agencyId), branchId: nurseApproval.branchId }))!._id.toString();
     medicalAvailabilityId = (await connection.collection('medicalAvailability').findOne({ agencyId: new Types.ObjectId(agencyId) }))!._id.toString();
     expirationRecordId = (await connection.collection('expirationRecords').findOne({ agencyId: new Types.ObjectId(agencyId) }))!._id.toString();
 
@@ -86,6 +92,17 @@ describe('Operational modules', () => {
       const result = await nurseApprovalsService.findOne(adminActor, nurseApprovalId);
       expect(result).toHaveProperty('_id');
       expect(result.agencyId.toString()).toBe(agencyId);
+    });
+
+    it('blocks a branch-scoped nurse from unrelated branch nurse approvals', async () => {
+      const branchNurseActor: AuthUser = {
+        ...adminActor,
+        role: UserRole.NURSE,
+        branchId: otherBranchId,
+      };
+      await expect(nurseApprovalsService.findOne(branchNurseActor, nurseApprovalId)).rejects.toThrow();
+      const visible = await nurseApprovalsService.list(branchNurseActor);
+      expect(visible.some((item) => item._id.toString() === nurseApprovalId)).toBe(false);
     });
 
     it('approves a nurse approval', async () => {
@@ -124,15 +141,26 @@ describe('Operational modules', () => {
       const result = await inspectionFindingsService.updateFindingStatus(adminActor, inspectionFindingId, {
         status: 'in_progress',
       });
-      expect(result.status).toBe('in_progress');
+      expect(result!.status).toBe('in_progress');
+    });
+
+    it('blocks branch-scoped nurses from updating unrelated branch findings', async () => {
+      const branchNurseActor: AuthUser = {
+        ...adminActor,
+        role: UserRole.NURSE,
+        branchId: otherBranchId,
+      };
+      await expect(inspectionFindingsService.updateFindingStatus(branchNurseActor, inspectionFindingId, {
+        status: 'resolved',
+      })).rejects.toThrow();
     });
 
     it('updates finding status to resolved and sets resolvedAt', async () => {
       const result = await inspectionFindingsService.updateFindingStatus(adminActor, inspectionFindingId, {
         status: 'resolved',
       });
-      expect(result.status).toBe('resolved');
-      expect(result.resolvedAt).toBeTruthy();
+      expect(result!.status).toBe('resolved');
+      expect(result!.resolvedAt).toBeTruthy();
     });
   });
 
@@ -162,7 +190,18 @@ describe('Operational modules', () => {
       const result = await socialWorkCasesService.updateStatus(adminActor, socialWorkCaseId, {
         status: 'closed',
       });
-      expect(result.status).toBe('closed');
+      expect(result!.status).toBe('closed');
+    });
+
+    it('blocks social workers from unrelated branch social work cases', async () => {
+      const branchSocialWorkerActor: AuthUser = {
+        ...adminActor,
+        role: UserRole.SOCIAL_WORKER,
+        branchId: otherBranchId,
+      };
+      await expect(socialWorkCasesService.updateStatus(branchSocialWorkerActor, socialWorkCaseId, {
+        status: 'closed',
+      })).rejects.toThrow();
     });
   });
 
@@ -192,7 +231,18 @@ describe('Operational modules', () => {
       const result = await intakeRecordsService.updateStage(adminActor, intakeRecordId, {
         stage: 'active',
       });
-      expect(result.stage).toBe('active');
+      expect(result!.stage).toBe('active');
+    });
+
+    it('blocks branch-scoped intake agents from unrelated branch intake records', async () => {
+      const branchIntakeActor: AuthUser = {
+        ...adminActor,
+        role: UserRole.INTAKE_AGENT,
+        branchId: otherBranchId,
+      };
+      await expect(intakeRecordsService.updateStage(branchIntakeActor, intakeRecordId, {
+        stage: 'active',
+      })).rejects.toThrow();
     });
   });
 
@@ -269,6 +319,24 @@ describe('Operational modules', () => {
       };
       const result = await nurseApprovalsService.list(caregiverActor);
       expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('blocks SOCIAL_WORKER from intake and nurse-only records', async () => {
+      const socialWorkerActor: AuthUser = {
+        ...adminActor,
+        role: UserRole.SOCIAL_WORKER,
+      };
+      await expect(intakeRecordsService.list(socialWorkerActor)).rejects.toThrow();
+      await expect(nurseApprovalsService.list(socialWorkerActor)).rejects.toThrow();
+    });
+
+    it('blocks INTAKE_AGENT from clinical review records', async () => {
+      const intakeActor: AuthUser = {
+        ...adminActor,
+        role: UserRole.INTAKE_AGENT,
+      };
+      await expect(nurseApprovalsService.list(intakeActor)).rejects.toThrow();
+      await expect(inspectionFindingsService.listFindings(intakeActor)).rejects.toThrow();
     });
   });
 });

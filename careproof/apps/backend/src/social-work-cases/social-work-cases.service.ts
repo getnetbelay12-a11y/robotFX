@@ -7,6 +7,7 @@ import { UpdateCaseStatusDto } from './dto/update-case-status.dto';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/types';
 import { requirePermission } from '../auth/permissions';
+import { requireBranchScope } from '../auth/scope';
 
 @Injectable()
 export class SocialWorkCasesService {
@@ -18,8 +19,15 @@ export class SocialWorkCasesService {
 
   async list(actor: AuthUser) {
     requirePermission(actor.role, 'social_work.read');
+    const filter: Record<string, unknown> = {
+      agencyId: new Types.ObjectId(actor.agencyId),
+      deletedAt: null,
+    };
+    if (actor.branchId) {
+      filter.branchId = new Types.ObjectId(actor.branchId);
+    }
     return this.model
-      .find({ agencyId: new Types.ObjectId(actor.agencyId), deletedAt: null })
+      .find(filter)
       .sort({ createdAt: -1 })
       .lean();
   }
@@ -29,6 +37,7 @@ export class SocialWorkCasesService {
     const doc = await this.model.create({
       ...dto,
       clientId: dto.clientId ? new Types.ObjectId(dto.clientId) : undefined,
+      branchId: dto.branchId ? new Types.ObjectId(dto.branchId) : actor.branchId ? new Types.ObjectId(actor.branchId) : undefined,
       linkedConcernId: dto.linkedConcernId ? new Types.ObjectId(dto.linkedConcernId) : undefined,
       agencyId: new Types.ObjectId(actor.agencyId),
       status: 'active',
@@ -45,12 +54,14 @@ export class SocialWorkCasesService {
 
   async updateStatus(actor: AuthUser, id: string, dto: UpdateCaseStatusDto) {
     requirePermission(actor.role, 'social_work.write');
-    const doc = await this.model.findOneAndUpdate(
-      { _id: new Types.ObjectId(id), agencyId: new Types.ObjectId(actor.agencyId), deletedAt: null },
-      { status: dto.status },
-      { new: true },
-    );
-    if (!doc) throw new NotFoundException('Social work case not found');
+    const existing = await this.model.findOne({
+      _id: new Types.ObjectId(id),
+      agencyId: new Types.ObjectId(actor.agencyId),
+      deletedAt: null,
+    });
+    if (!existing) throw new NotFoundException('Social work case not found');
+    requireBranchScope(existing.branchId, actor);
+    const doc = await this.model.findOneAndUpdate({ _id: existing._id }, { status: dto.status }, { new: true });
     await this.auditService.log({
       agencyId: new Types.ObjectId(actor.agencyId),
       actorUserId: new Types.ObjectId(actor.sub),

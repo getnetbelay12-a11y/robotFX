@@ -62,13 +62,14 @@ export class FamilyService {
   }
 
   async listConcerns(agencyId: string) {
-    return this.concernModel.find({ agencyId: new Types.ObjectId(agencyId) }).sort({ createdAt: -1 }).lean();
+    return this.concernModel.find({ agencyId: new Types.ObjectId(agencyId), deletedAt: null }).sort({ createdAt: -1 }).lean();
   }
 
   async findConcern(agencyId: string, concernId: string) {
     const concern = await this.concernModel.findOne({
       _id: new Types.ObjectId(concernId),
       agencyId: new Types.ObjectId(agencyId),
+      deletedAt: null,
     }).lean();
     if (!concern) {
       throw new ForbiddenException('Concern not found for this agency');
@@ -80,7 +81,7 @@ export class FamilyService {
     requirePermission(actor.role, 'family_concern.respond', 'Only agency operators can respond to family concerns.');
 
     const existing = await this.concernModel
-      .findOne({ _id: new Types.ObjectId(concernId), agencyId: new Types.ObjectId(agencyId) })
+      .findOne({ _id: new Types.ObjectId(concernId), agencyId: new Types.ObjectId(agencyId), deletedAt: null })
       .lean();
     if (!existing) {
       throw new ForbiddenException('Concern not found for this agency');
@@ -101,7 +102,7 @@ export class FamilyService {
 
     const concern = await this.concernModel
       .findOneAndUpdate(
-        { _id: new Types.ObjectId(concernId), agencyId: new Types.ObjectId(agencyId) },
+        { _id: new Types.ObjectId(concernId), agencyId: new Types.ObjectId(agencyId), deletedAt: null },
         updates,
         { new: true },
       )
@@ -132,6 +133,10 @@ export class FamilyService {
             .find({
               agencyId: new Types.ObjectId(actor.agencyId),
               clientId: { $in: clientIds },
+              'familySummary.sentAt': { $ne: null },
+              'familySummary.text': { $ne: '' },
+              'familySummary.sentTo': new Types.ObjectId(actor.sub),
+              status: 'completed',
               deletedAt: null,
             })
             .sort({ scheduledStart: -1 })
@@ -195,7 +200,10 @@ export class FamilyService {
       .find({
         agencyId: new Types.ObjectId(actor.agencyId),
         clientId: new Types.ObjectId(clientId),
-        status: { $in: ['completed', 'requires_review'] },
+        status: 'completed',
+        'familySummary.sentAt': { $ne: null },
+        'familySummary.text': { $ne: '' },
+        'familySummary.sentTo': new Types.ObjectId(actor.sub),
         deletedAt: null,
       })
       .sort({ scheduledStart: -1 })

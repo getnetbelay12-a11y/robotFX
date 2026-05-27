@@ -6,6 +6,7 @@ import { VisitStatus } from '../visits/visit.schema';
 type SeedUser = {
   _id: Types.ObjectId;
   agencyId: Types.ObjectId;
+  branchId: Types.ObjectId;
   role: UserRole;
   firstName: string;
   lastName: string;
@@ -250,6 +251,7 @@ export async function seedDemoData(connection: Connection) {
   const users: SeedUser[] = baseUsers.map(([seedKey, firstName, lastName, email, role]) => ({
     _id: new Types.ObjectId(),
     agencyId,
+    branchId: ['caregiver2', 'caregiver4', 'caregiver8', 'intake'].includes(seedKey) ? westviewBranchId : northsideBranchId,
     role,
     firstName,
     lastName,
@@ -266,6 +268,7 @@ export async function seedDemoData(connection: Connection) {
     users.push({
       _id: new Types.ObjectId(),
       agencyId,
+      branchId: index % 2 === 0 ? northsideBranchId : westviewBranchId,
       role: UserRole.FAMILY_MEMBER,
       firstName: `Family${index}`,
       lastName: 'Contact',
@@ -892,6 +895,7 @@ export async function seedDemoData(connection: Connection) {
   await connection.collection('nurseApprovals').insertMany([
     {
       agencyId,
+      branchId: northsideBranchId,
       visitId: new Types.ObjectId(),
       caregiverId: caregiver1User._id,
       clientName: 'Maria Johnson',
@@ -909,6 +913,7 @@ export async function seedDemoData(connection: Connection) {
     },
     {
       agencyId,
+      branchId: westviewBranchId,
       visitId: new Types.ObjectId(),
       caregiverId: caregiver2User._id,
       clientName: 'Robert Chen',
@@ -926,6 +931,7 @@ export async function seedDemoData(connection: Connection) {
     },
     {
       agencyId,
+      branchId: northsideBranchId,
       visitId: new Types.ObjectId(),
       caregiverId: caregiver1User._id,
       clientName: 'Dorothy Williams',
@@ -957,6 +963,7 @@ export async function seedDemoData(connection: Connection) {
   await connection.collection('inspectionFindings').insertMany([
     {
       agencyId,
+      branchId: northsideBranchId,
       ruleId: seededRules[0]._id,
       title: 'Care plan signature missing for 3 visits',
       severity: 'compliance',
@@ -976,6 +983,7 @@ export async function seedDemoData(connection: Connection) {
     },
     {
       agencyId,
+      branchId: westviewBranchId,
       ruleId: seededRules[1]._id,
       title: '2 caregivers with expired CPR certification',
       severity: 'high',
@@ -992,6 +1000,7 @@ export async function seedDemoData(connection: Connection) {
     },
     {
       agencyId,
+      branchId: westviewBranchId,
       ruleId: seededRules[2]._id,
       title: 'Incident report filed 4 hours late',
       severity: 'critical',
@@ -1014,6 +1023,7 @@ export async function seedDemoData(connection: Connection) {
   await connection.collection('socialWorkCases').insertMany([
     {
       agencyId,
+      branchId: northsideBranchId,
       clientName: 'Maria Johnson',
       clientId: clients[0]._id,
       linkedConcernId: familyConcerns[1]._id,
@@ -1029,6 +1039,7 @@ export async function seedDemoData(connection: Connection) {
     },
     {
       agencyId,
+      branchId: westviewBranchId,
       clientName: 'George Patterson',
       clientId: new Types.ObjectId(),
       linkedConcernId: null,
@@ -1044,6 +1055,7 @@ export async function seedDemoData(connection: Connection) {
     },
     {
       agencyId,
+      branchId: northsideBranchId,
       clientName: 'Frances Cooper',
       clientId: new Types.ObjectId(),
       linkedConcernId: null,

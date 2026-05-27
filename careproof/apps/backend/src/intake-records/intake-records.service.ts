@@ -7,6 +7,7 @@ import { UpdateIntakeStageDto } from './dto/update-intake-stage.dto';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/types';
 import { requirePermission } from '../auth/permissions';
+import { requireBranchScope } from '../auth/scope';
 
 @Injectable()
 export class IntakeRecordsService {
@@ -18,8 +19,15 @@ export class IntakeRecordsService {
 
   async list(actor: AuthUser) {
     requirePermission(actor.role, 'intake.read');
+    const filter: Record<string, unknown> = {
+      agencyId: new Types.ObjectId(actor.agencyId),
+      deletedAt: null,
+    };
+    if (actor.branchId) {
+      filter.branchId = new Types.ObjectId(actor.branchId);
+    }
     return this.model
-      .find({ agencyId: new Types.ObjectId(actor.agencyId), deletedAt: null })
+      .find(filter)
       .sort({ createdAt: -1 })
       .lean();
   }
@@ -28,7 +36,7 @@ export class IntakeRecordsService {
     requirePermission(actor.role, 'intake.write');
     const doc = await this.model.create({
       ...dto,
-      branchId: dto.branchId ? new Types.ObjectId(dto.branchId) : undefined,
+      branchId: dto.branchId ? new Types.ObjectId(dto.branchId) : actor.branchId ? new Types.ObjectId(actor.branchId) : undefined,
       agencyId: new Types.ObjectId(actor.agencyId),
     });
     await this.auditService.log({
@@ -43,12 +51,14 @@ export class IntakeRecordsService {
 
   async updateStage(actor: AuthUser, id: string, dto: UpdateIntakeStageDto) {
     requirePermission(actor.role, 'intake.write');
-    const doc = await this.model.findOneAndUpdate(
-      { _id: new Types.ObjectId(id), agencyId: new Types.ObjectId(actor.agencyId), deletedAt: null },
-      { stage: dto.stage },
-      { new: true },
-    );
-    if (!doc) throw new NotFoundException('Intake record not found');
+    const existing = await this.model.findOne({
+      _id: new Types.ObjectId(id),
+      agencyId: new Types.ObjectId(actor.agencyId),
+      deletedAt: null,
+    });
+    if (!existing) throw new NotFoundException('Intake record not found');
+    requireBranchScope(existing.branchId, actor);
+    const doc = await this.model.findOneAndUpdate({ _id: existing._id }, { stage: dto.stage }, { new: true });
     await this.auditService.log({
       agencyId: new Types.ObjectId(actor.agencyId),
       actorUserId: new Types.ObjectId(actor.sub),
