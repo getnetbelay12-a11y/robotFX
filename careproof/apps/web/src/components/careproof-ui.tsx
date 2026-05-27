@@ -92,6 +92,8 @@ import {
   saveCanonicalDemoVisitNoteApi,
   skipCanonicalDemoTaskApi,
   updateFindingStatusApi,
+  updateIntakeStageApi,
+  updateMedicalAvailabilityStatusApi,
   updateRenewalStatusApi,
   updateSocialWorkCaseStatusApi,
   generateVisitSummaryApi,
@@ -4858,8 +4860,10 @@ export function NurseApprovalsScreen() {
 
   useEffect(() => {
     fetchNurseApprovalsApi().then((data) => {
-      setApprovals(data);
-      setBackendConnected(true);
+      if (data.length > 0) {
+        setApprovals(data);
+        setBackendConnected(true);
+      }
     }).catch(() => {});
   }, []);
 
@@ -4888,7 +4892,7 @@ export function NurseApprovalsScreen() {
               approval.approvalType,
               <StatusBadge key="priority" status={approval.priority} />,
               <StatusBadge key="status" status={visibleStatus(approval)} />,
-              users.find((user) => user.id === approval.assignedNurseId)?.name ?? 'Nurse',
+              (users.find((user) => user.id === approval.assignedNurseId)?.name ?? approval.assignedNurseId) || 'Nurse',
               approval.submittedTime,
               <button key="action" type="button" className="textAction" onClick={() => setSelectedId(approval.id)}>Review</button>,
             ])}
@@ -4938,9 +4942,11 @@ export function InspectionCenterScreen() {
   useEffect(() => {
     Promise.all([fetchInspectionFindingsApi(), fetchInspectionRulesApi()])
       .then(([findingsData, rulesData]) => {
-        setFindings(findingsData);
-        setRules(rulesData);
-        setBackendConnected(true);
+        if (findingsData.length > 0 || rulesData.length > 0) {
+          if (findingsData.length > 0) setFindings(findingsData);
+          if (rulesData.length > 0) setRules(rulesData);
+          setBackendConnected(true);
+        }
       })
       .catch(() => {});
   }, []);
@@ -5004,8 +5010,10 @@ export function SocialWorkScreen() {
 
   useEffect(() => {
     fetchSocialWorkCasesApi().then((data) => {
-      setCases(data);
-      setBackendConnected(true);
+      if (data.length > 0) {
+        setCases(data);
+        setBackendConnected(true);
+      }
     }).catch(() => {});
   }, []);
 
@@ -5043,16 +5051,27 @@ export function SocialWorkScreen() {
 export function IntakeAgentsScreen() {
   const [records, setRecords] = useState(intakeRecords);
   const [backendConnected, setBackendConnected] = useState(false);
+  const [stageOverrides, setStageOverrides] = useState<Record<string, string>>({});
+  const NEXT_BACKEND_STAGE: Record<string, string> = {
+    'New Referral': 'assessment',
+    'Assessment Scheduled': 'authorization',
+    'Nurse Approval Required': 'onboarding',
+    'Ready for Scheduling': 'active',
+  };
+  const visibleStage = (item: typeof records[number]) => stageOverrides[item.id] ?? item.stage;
   const stageCounts = records.reduce<Record<string, number>>((acc, item) => {
-    acc[item.stage] = (acc[item.stage] ?? 0) + 1;
+    const stage = visibleStage(item);
+    acc[stage] = (acc[stage] ?? 0) + 1;
     return acc;
   }, {});
   const activeStages = Object.entries(stageCounts);
 
   useEffect(() => {
     fetchIntakeRecordsApi().then((data) => {
-      setRecords(data);
-      setBackendConnected(true);
+      if (data.length > 0) {
+        setRecords(data);
+        setBackendConnected(true);
+      }
     }).catch(() => {});
   }, []);
 
@@ -5073,13 +5092,43 @@ export function IntakeAgentsScreen() {
           {activeStages.map(([stage]) => (
             <div key={stage} className="kanbanColumn kanbanColumn-neutral">
               <div className="kanbanHeader"><strong>{stage}</strong><span className="kanbanBadge">{stageCounts[stage]}</span></div>
-              {records.filter((item) => item.stage === stage).map((item) => (
-                <div key={item.id} className="visitCard">
-                  <div className="visitCardTop"><strong>{item.prospectName}</strong><StatusBadge status={item.priority} /></div>
-                  <p>{item.requiredServices.join(', ')}</p>
-                  <p><strong>Next:</strong> {item.nextAction}</p>
-                </div>
-              ))}
+              {records.filter((item) => visibleStage(item) === stage).map((item) => {
+                const nextStage = NEXT_BACKEND_STAGE[stage];
+                return (
+                  <div key={item.id} className="visitCard">
+                    <div className="visitCardTop"><strong>{item.prospectName}</strong><StatusBadge status={item.priority} /></div>
+                    <p>{item.requiredServices.join(', ')}</p>
+                    <p><strong>Next:</strong> {item.nextAction}</p>
+                    {nextStage && (
+                      <button
+                        type="button"
+                        className="textAction"
+                        onClick={async () => {
+                          const nextDisplay = Object.entries(NEXT_BACKEND_STAGE).find(([, value]) => value === nextStage)?.[0];
+                          if (nextDisplay) setStageOverrides((current) => ({ ...current, [item.id]: nextDisplay }));
+                          try {
+                            const updated = await updateIntakeStageApi(item.id, nextStage);
+                            setRecords((previous) => previous.map((record) => record.id === updated.id ? updated : record));
+                            setStageOverrides((current) => {
+                              const next = { ...current };
+                              delete next[updated.id];
+                              return next;
+                            });
+                          } catch {
+                            setStageOverrides((current) => {
+                              const next = { ...current };
+                              delete next[item.id];
+                              return next;
+                            });
+                          }
+                        }}
+                      >
+                        Advance
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>
@@ -5090,8 +5139,8 @@ export function IntakeAgentsScreen() {
           rows={records.map((item) => [
             item.prospectName,
             item.referralSource,
-            users.find((user) => user.id === item.assignedAgentId)?.name,
-            getBranch(item.branchId)?.name,
+            users.find((user) => user.id === item.assignedAgentId)?.name ?? item.assignedAgentId ?? 'Agent',
+            getBranch(item.branchId)?.name ?? '-',
             item.payerType,
             <StatusBadge key="docs" status={item.documentsStatus} />,
             <StatusBadge key="nurse" status={item.nurseApprovalStatus} />,
@@ -5106,14 +5155,18 @@ export function IntakeAgentsScreen() {
 export function MedicalAvailabilityScreen() {
   const [medRecords, setMedRecords] = useState(medicalAvailabilityRecords);
   const [backendConnected, setBackendConnected] = useState(false);
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
+  const visibleStatus = (item: typeof medRecords[number]) => statusOverrides[item.id] ?? item.status;
   const blocked = medRecords.filter((item) => item.blocksVisit).length;
-  const missing = medRecords.filter((item) => ['Missing', 'Expired'].includes(item.status)).length;
-  const needsConfirmation = medRecords.filter((item) => item.status === 'Needs Confirmation').length;
+  const missing = medRecords.filter((item) => ['Missing', 'Expired'].includes(visibleStatus(item))).length;
+  const needsConfirmation = medRecords.filter((item) => visibleStatus(item) === 'Needs Confirmation').length;
 
   useEffect(() => {
     fetchMedicalAvailabilityApi().then((data) => {
-      setMedRecords(data);
-      setBackendConnected(true);
+      if (data.length > 0) {
+        setMedRecords(data);
+        setBackendConnected(true);
+      }
     }).catch(() => {});
   }, []);
 
@@ -5129,15 +5182,41 @@ export function MedicalAvailabilityScreen() {
         <StatCard label="Staff coverage gaps" value={medRecords.filter((item) => item.type.includes('availability') || item.type === 'Backup caregiver').length} tone="info" />
       </div>
       <DataTable
-        columns={['Client / Visit', 'Availability type', 'Status', 'Owner', 'Detail', 'Next action', 'Blocks visit']}
+        columns={['Client / Visit', 'Availability type', 'Status', 'Owner', 'Detail', 'Next action', 'Blocks visit', 'Actions']}
         rows={medRecords.map((item) => [
-          item.clientId ? getClient(item.clientId)?.name : 'Agency',
+          item.clientName ?? (item.clientId ? getClient(item.clientId)?.name : null) ?? 'Agency',
           item.type,
-          <StatusBadge key="status" status={item.status} />,
+          <StatusBadge key="status" status={visibleStatus(item)} />,
           item.owner,
           item.detail,
           item.nextAction,
           item.blocksVisit ? <StatusBadge key="blocker" status="Blocker" /> : <StatusBadge key="available" status="Available" />,
+          <div key="actions" className="inlineActions">
+            <button
+              type="button"
+              className="textAction"
+              onClick={async () => {
+                setStatusOverrides((current) => ({ ...current, [item.id]: 'Available' }));
+                try {
+                  const updated = await updateMedicalAvailabilityStatusApi(item.id, 'confirmed');
+                  setMedRecords((previous) => previous.map((record) => record.id === updated.id ? updated : record));
+                  setStatusOverrides((current) => {
+                    const next = { ...current };
+                    delete next[updated.id];
+                    return next;
+                  });
+                } catch {
+                  setStatusOverrides((current) => {
+                    const next = { ...current };
+                    delete next[item.id];
+                    return next;
+                  });
+                }
+              }}
+            >
+              Confirm
+            </button>
+          </div>,
         ])}
       />
     </AppShell>
@@ -5154,8 +5233,10 @@ export function ExpirationCenterScreen() {
 
   useEffect(() => {
     fetchExpirationRecordsApi().then((data) => {
-      setExpRecords(data);
-      setBackendConnected(true);
+      if (data.length > 0) {
+        setExpRecords(data);
+        setBackendConnected(true);
+      }
     }).catch(() => {});
   }, []);
 

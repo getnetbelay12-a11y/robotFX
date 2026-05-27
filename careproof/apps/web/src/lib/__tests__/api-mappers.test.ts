@@ -71,6 +71,22 @@ describe('mapNurseApproval', () => {
   it('returns empty auditTrail array', () => {
     expect(mapNurseApproval(raw).auditTrail).toEqual([]);
   });
+
+  it('sets nurseComments from nurseNotes when status is approved', () => {
+    expect(mapNurseApproval({ ...raw, status: 'approved', nurseNotes: 'Looks good.' }).nurseComments).toBe('Looks good.');
+  });
+
+  it('sets nurseComments from nurseNotes when status is rejected', () => {
+    expect(mapNurseApproval({ ...raw, status: 'rejected', nurseNotes: 'Missing data.' }).nurseComments).toBe('Missing data.');
+  });
+
+  it('sets nurseComments from nurseNotes when status is needs_clarification', () => {
+    expect(mapNurseApproval({ ...raw, status: 'needs_clarification', nurseNotes: 'Please clarify.' }).nurseComments).toBe('Please clarify.');
+  });
+
+  it('leaves nurseComments undefined when status is pending_review', () => {
+    expect(mapNurseApproval(raw).nurseComments).toBeUndefined();
+  });
 });
 
 describe('mapInspectionFinding', () => {
@@ -215,6 +231,18 @@ describe('mapSocialWorkCase', () => {
   it('sets escalationFlag=false when status=active', () => {
     expect(mapSocialWorkCase(raw).escalationFlag).toBe(false);
   });
+
+  it('sets clientId to empty string when raw.clientId is undefined', () => {
+    const { clientId: _id, ...noClientId } = raw;
+    void _id;
+    expect(mapSocialWorkCase({ ...noClientId, clientId: undefined }).clientId).toBe('');
+  });
+
+  it('does not use _id as clientId fallback', () => {
+    const { clientId: _cid, ...noClientId } = raw;
+    void _cid;
+    expect(mapSocialWorkCase({ ...noClientId, clientId: undefined }).clientId).not.toBe('sw-1');
+  });
 });
 
 describe('mapIntakeRecord', () => {
@@ -300,6 +328,14 @@ describe('mapMedicalAvailability', () => {
 
   it('maps serviceType to type', () => {
     expect(mapMedicalAvailability(raw).type).toBe('Medication availability');
+  });
+
+  it('maps clientName from raw.clientName', () => {
+    expect(mapMedicalAvailability(raw).clientName).toBe('Maria Johnson');
+  });
+
+  it('maps clientName when present', () => {
+    expect(mapMedicalAvailability({ ...raw, clientName: 'Helen Park' }).clientName).toBe('Helen Park');
   });
 });
 

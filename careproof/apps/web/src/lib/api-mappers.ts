@@ -62,6 +62,7 @@ export function mapNurseApproval(raw: BackendNurseApproval): NurseApproval {
     priority: 'Medium',
     status: NURSE_APPROVAL_STATUS[raw.status] ?? 'Submitted',
     notesSubmitted: raw.nurseNotes ?? '',
+    nurseComments: raw.status !== 'pending_review' ? (raw.nurseNotes ?? '') : undefined,
     auditTrail: [],
     blocksFamilyVisibility: raw.status === 'pending_review',
   };
@@ -145,7 +146,7 @@ const SW_CASE_TYPE: Record<BackendSocialWorkCase['category'], SocialWorkCaseType
 export function mapSocialWorkCase(raw: BackendSocialWorkCase): SocialWorkCase {
   return {
     id: raw._id,
-    clientId: raw.clientId ?? raw._id,
+    clientId: raw.clientId ?? '',
     assignedSocialWorkerId: raw.assignedWorker,
     source: '',
     caseType: SW_CASE_TYPE[raw.category] ?? 'Family concern follow-up',
@@ -202,6 +203,7 @@ export function mapMedicalAvailability(raw: BackendMedicalAvailability): Medical
   return {
     id: raw._id,
     clientId: raw.clientId,
+    clientName: raw.clientName,
     type: (raw.serviceType as AvailabilityType) ?? 'Medical supplies',
     status: AVAIL_STATUS[raw.status] ?? 'Needs Confirmation',
     owner: raw.providerName ?? '',
