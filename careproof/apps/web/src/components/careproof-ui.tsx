@@ -118,6 +118,7 @@ import {
   buildFallbackIntegrations,
   buildFallbackSystemStatus,
 } from '../lib/deployment-readiness';
+import { isDateStringToday } from '../lib/date-utils';
 import type {
   CarePlanTaskDefinition,
   ExceptionItem,
@@ -4970,7 +4971,7 @@ export function InspectionCenterScreen() {
               <div key="finding" className="tablePrimaryCell"><strong>{finding.title}</strong><span>{rules.find((rule) => rule.id === finding.ruleId)?.name}</span></div>,
               <StatusBadge key="severity" status={finding.severity} />,
               <StatusBadge key="status" status={visibleStatus(finding)} />,
-              finding.clientId ? getClient(finding.clientId)?.name : finding.caregiverId ? getCaregiver(finding.caregiverId)?.name : finding.relatedType,
+              finding.clientName ?? (finding.clientId ? getClient(finding.clientId)?.name : null) ?? finding.caregiverName ?? (finding.caregiverId ? getCaregiver(finding.caregiverId)?.name : null) ?? finding.relatedType,
               finding.owner,
               finding.recommendedAction,
               <div key="actions" className="inlineActions">
@@ -5006,7 +5007,7 @@ export function SocialWorkScreen() {
   const visibleStatus = (item: typeof cases[number]) => caseStatuses[item.id] ?? item.status;
   const open = cases.filter((item) => visibleStatus(item) !== 'Closed').length;
   const highRisk = cases.filter((item) => ['High', 'Critical'].includes(item.riskLevel)).length;
-  const followUps = cases.filter((item) => item.nextFollowUpDate.includes('Today')).length;
+  const followUps = cases.filter((item) => isDateStringToday(item.nextFollowUpDate)).length;
 
   useEffect(() => {
     fetchSocialWorkCasesApi().then((data) => {

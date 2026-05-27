@@ -79,6 +79,7 @@ describe('Operational modules', () => {
       expect(result.length).toBeGreaterThan(0);
       expect(result[0]).toHaveProperty('clientName');
       expect(result[0]).toHaveProperty('status');
+      expect(['low', 'medium', 'high', 'critical']).toContain(result[0].priority);
     });
 
     it('finds one nurse approval by id', async () => {
@@ -114,6 +115,9 @@ describe('Operational modules', () => {
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBeGreaterThan(0);
       expect(result[0]).toHaveProperty('severity');
+      expect(result.some((finding) => finding.severity === 'compliance')).toBe(true);
+      expect(result.some((finding) => finding.clientId || finding.visitId || finding.caregiverId)).toBe(true);
+      expect(result.some((finding) => finding.clientName || finding.caregiverName)).toBe(true);
     });
 
     it('updates finding status to in_progress', async () => {
@@ -139,6 +143,7 @@ describe('Operational modules', () => {
       expect(result.length).toBeGreaterThan(0);
       expect(result[0]).toHaveProperty('clientName');
       expect(result[0]).toHaveProperty('category');
+      expect(result.some((item) => item.linkedConcernId)).toBe(true);
     });
 
     it('creates a social work case', async () => {
@@ -167,6 +172,8 @@ describe('Operational modules', () => {
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBeGreaterThan(0);
       expect(result[0]).toHaveProperty('stage');
+      expect(result[0]).toHaveProperty('branchId');
+      expect(result[0].branchId.toString()).not.toBe(agencyId);
     });
 
     it('creates an intake record', async () => {

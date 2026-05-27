@@ -1,4 +1,4 @@
-import { IsString, IsIn, IsOptional } from 'class-validator';
+import { IsString, IsIn, IsOptional, IsMongoId } from 'class-validator';
 
 export class CreateIntakeRecordDto {
   @IsString()
@@ -6,6 +6,10 @@ export class CreateIntakeRecordDto {
 
   @IsString()
   agentName!: string;
+
+  @IsMongoId()
+  @IsOptional()
+  branchId?: string;
 
   @IsIn(['inquiry', 'assessment', 'authorization', 'onboarding', 'active'])
   stage!: string;

@@ -1,4 +1,4 @@
-import { IsString, IsMongoId, IsOptional } from 'class-validator';
+import { IsString, IsMongoId, IsOptional, IsIn } from 'class-validator';
 
 export class CreateNurseApprovalDto {
   @IsMongoId()
@@ -19,6 +19,10 @@ export class CreateNurseApprovalDto {
 
   @IsString()
   visitType!: string;
+
+  @IsIn(['low', 'medium', 'high', 'critical'])
+  @IsOptional()
+  priority?: string;
 
   @IsString()
   @IsOptional()

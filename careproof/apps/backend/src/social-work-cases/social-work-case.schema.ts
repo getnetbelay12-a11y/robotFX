@@ -14,6 +14,9 @@ export class SocialWorkCase {
   @Prop({ type: Types.ObjectId })
   clientId!: Types.ObjectId;
 
+  @Prop({ type: Types.ObjectId })
+  linkedConcernId!: Types.ObjectId;
+
   @Prop({ required: true })
   assignedWorker!: string;
 

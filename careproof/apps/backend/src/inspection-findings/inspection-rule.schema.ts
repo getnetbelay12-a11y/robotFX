@@ -14,7 +14,7 @@ export class InspectionRule {
   @Prop({ required: true })
   description!: string;
 
-  @Prop({ required: true, enum: ['critical', 'high', 'medium', 'low'] })
+  @Prop({ required: true, enum: ['critical', 'high', 'medium', 'low', 'compliance'] })
   severity!: string;
 
   @Prop({ required: true })

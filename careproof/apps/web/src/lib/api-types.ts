@@ -11,6 +11,7 @@ export type BackendNurseApproval = {
   caregiverName: string;
   visitDate: string;
   visitType: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
   status: 'pending_review' | 'approved' | 'rejected' | 'needs_clarification';
   nurseNotes?: string;
   reviewedBy?: string;
@@ -24,8 +25,13 @@ export type BackendInspectionFinding = {
   agencyId: string;
   ruleId: string;
   title: string;
-  severity: 'critical' | 'high' | 'medium' | 'low';
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'compliance';
   status: 'open' | 'in_progress' | 'resolved' | 'waived';
+  clientId?: string;
+  visitId?: string;
+  caregiverId?: string;
+  clientName?: string;
+  caregiverName?: string;
   description?: string;
   assignedTo?: string;
   dueDate?: string;
@@ -39,7 +45,7 @@ export type BackendInspectionRule = {
   agencyId: string;
   ruleCode: string;
   description: string;
-  severity: 'critical' | 'high' | 'medium' | 'low';
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'compliance';
   category: string;
   active: boolean;
   createdAt: string;
@@ -51,6 +57,7 @@ export type BackendSocialWorkCase = {
   agencyId: string;
   clientName: string;
   clientId?: string;
+  linkedConcernId?: string | null;
   assignedWorker: string;
   category: 'housing' | 'benefits' | 'mental_health' | 'family' | 'legal' | 'other';
   status: 'active' | 'pending_review' | 'closed' | 'escalated';
@@ -64,6 +71,7 @@ export type BackendSocialWorkCase = {
 export type BackendIntakeRecord = {
   _id: string;
   agencyId: string;
+  branchId?: string;
   clientName: string;
   agentName: string;
   stage: 'inquiry' | 'assessment' | 'authorization' | 'onboarding' | 'active';

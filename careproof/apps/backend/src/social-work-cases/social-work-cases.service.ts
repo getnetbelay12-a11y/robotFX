@@ -29,6 +29,7 @@ export class SocialWorkCasesService {
     const doc = await this.model.create({
       ...dto,
       clientId: dto.clientId ? new Types.ObjectId(dto.clientId) : undefined,
+      linkedConcernId: dto.linkedConcernId ? new Types.ObjectId(dto.linkedConcernId) : undefined,
       agencyId: new Types.ObjectId(actor.agencyId),
       status: 'active',
     });

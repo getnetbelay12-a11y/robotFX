@@ -59,7 +59,7 @@ export function mapNurseApproval(raw: BackendNurseApproval): NurseApproval {
     assignedNurseId: raw.reviewedBy ?? '',
     approvalType: (raw.visitType as ApprovalType) ?? 'Care note approval',
     submittedTime: formatApiDate(raw.createdAt),
-    priority: 'Medium',
+    priority: raw.priority === 'critical' ? 'Critical' : raw.priority === 'high' ? 'High' : raw.priority === 'low' ? 'Low' : 'Medium',
     status: NURSE_APPROVAL_STATUS[raw.status] ?? 'Submitted',
     notesSubmitted: raw.nurseNotes ?? '',
     nurseComments: raw.status !== 'pending_review' ? (raw.nurseNotes ?? '') : undefined,
@@ -77,6 +77,7 @@ const INSPECTION_SEVERITY: Record<BackendInspectionFinding['severity'], Inspecti
   high: 'Warning',
   medium: 'Info',
   low: 'Info',
+  compliance: 'Compliance',
 };
 
 const INSPECTION_STATUS: Record<BackendInspectionFinding['status'], InspectionStatus> = {
@@ -93,7 +94,12 @@ export function mapInspectionFinding(raw: BackendInspectionFinding): InspectionF
     title: raw.title,
     severity: INSPECTION_SEVERITY[raw.severity] ?? 'Info',
     status: INSPECTION_STATUS[raw.status] ?? 'Open',
-    relatedType: 'Visit',
+    relatedType: raw.visitId ? 'Visit' : raw.clientId ? 'Client' : raw.caregiverId ? 'Caregiver' : 'Agency',
+    clientId: raw.clientId,
+    clientName: raw.clientName,
+    visitId: raw.visitId,
+    caregiverId: raw.caregiverId,
+    caregiverName: raw.caregiverName,
     owner: raw.assignedTo ?? '',
     openedAt: formatApiDate(raw.createdAt),
     recommendedAction: raw.description ?? '',
@@ -110,6 +116,7 @@ const RULE_SEVERITY: Record<BackendInspectionRule['severity'], InspectionSeverit
   high: 'Warning',
   medium: 'Info',
   low: 'Info',
+  compliance: 'Compliance',
 };
 
 export function mapInspectionRule(raw: BackendInspectionRule): InspectionRule {
@@ -155,6 +162,7 @@ export function mapSocialWorkCase(raw: BackendSocialWorkCase): SocialWorkCase {
     nextFollowUpDate: raw.nextFollowUp ?? '',
     internalNotes: raw.description ? [raw.description] : [],
     escalationFlag: raw.status === 'escalated',
+    linkedConcernId: raw.linkedConcernId ?? undefined,
   };
 }
 
@@ -176,7 +184,7 @@ export function mapIntakeRecord(raw: BackendIntakeRecord): IntakeRecord {
     prospectName: raw.clientName,
     referralSource: raw.referralSource,
     assignedAgentId: raw.agentName,
-    branchId: raw.agencyId,
+    branchId: raw.branchId ?? '',
     stage: INTAKE_STAGE[raw.stage] ?? 'New Referral',
     priority: raw.priority === 'urgent' || raw.priority === 'high' ? 'High' : raw.priority === 'medium' ? 'Medium' : 'Low',
     requiredServices: [],

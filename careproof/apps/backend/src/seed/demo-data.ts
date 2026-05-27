@@ -202,6 +202,8 @@ function buildVisitRecord({
 
 export async function seedDemoData(connection: Connection) {
   const agencyId = new Types.ObjectId();
+  const northsideBranchId = new Types.ObjectId();
+  const westviewBranchId = new Types.ObjectId();
   const passwordHash = await argon2.hash('Password123!');
   const now = new Date();
   const weekStart = daysAgo(now, 6, 0, 0);
@@ -896,6 +898,7 @@ export async function seedDemoData(connection: Connection) {
       caregiverName: 'Ana Smith',
       visitDate: atTime(now, 9, 0).toISOString().split('T')[0],
       visitType: 'Personal Care',
+      priority: 'high',
       status: 'pending_review',
       nurseNotes: null,
       reviewedBy: null,
@@ -912,6 +915,7 @@ export async function seedDemoData(connection: Connection) {
       caregiverName: 'Joseph Lee',
       visitDate: daysAgo(now, 2, 0, 0).toISOString().split('T')[0],
       visitType: 'Skilled Nursing',
+      priority: 'medium',
       status: 'approved',
       nurseNotes: 'All vitals within normal range. Care plan followed.',
       reviewedBy: coordinatorUser._id,
@@ -928,6 +932,7 @@ export async function seedDemoData(connection: Connection) {
       caregiverName: 'Ana Smith',
       visitDate: daysAgo(now, 3, 0, 0).toISOString().split('T')[0],
       visitType: 'Medication Management',
+      priority: 'critical',
       status: 'needs_clarification',
       nurseNotes: 'Patient reported dizziness after medication. Follow-up required.',
       reviewedBy: coordinatorUser._id,
@@ -943,7 +948,7 @@ export async function seedDemoData(connection: Connection) {
     { agencyId, ruleCode: 'CARE-002', description: 'Caregiver must complete required training annually', severity: 'high', category: 'Training', active: true, deletedAt: null, createdAt: daysAgo(now, 30, 0, 0), updatedAt: daysAgo(now, 30, 0, 0) },
     { agencyId, ruleCode: 'CARE-003', description: 'Incident reports must be filed within 2 hours', severity: 'critical', category: 'Reporting', active: true, deletedAt: null, createdAt: daysAgo(now, 30, 0, 0), updatedAt: daysAgo(now, 30, 0, 0) },
     { agencyId, ruleCode: 'CARE-004', description: 'Medication logs must be completed at each visit', severity: 'high', category: 'Medication', active: true, deletedAt: null, createdAt: daysAgo(now, 30, 0, 0), updatedAt: daysAgo(now, 30, 0, 0) },
-    { agencyId, ruleCode: 'CARE-005', description: 'Client rights must be reviewed quarterly', severity: 'medium', category: 'Compliance', active: true, deletedAt: null, createdAt: daysAgo(now, 30, 0, 0), updatedAt: daysAgo(now, 30, 0, 0) },
+    { agencyId, ruleCode: 'CARE-005', description: 'Client rights must be reviewed quarterly', severity: 'compliance', category: 'Compliance', active: true, deletedAt: null, createdAt: daysAgo(now, 30, 0, 0), updatedAt: daysAgo(now, 30, 0, 0) },
     { agencyId, ruleCode: 'CARE-006', description: 'Emergency contact info must be current', severity: 'medium', category: 'Safety', active: true, deletedAt: null, createdAt: daysAgo(now, 30, 0, 0), updatedAt: daysAgo(now, 30, 0, 0) },
   ]);
 
@@ -954,8 +959,13 @@ export async function seedDemoData(connection: Connection) {
       agencyId,
       ruleId: seededRules[0]._id,
       title: 'Care plan signature missing for 3 visits',
-      severity: 'critical',
+      severity: 'compliance',
       status: 'open',
+      clientId: clients[0]._id,
+      visitId: todayVisits[0]._id,
+      caregiverId: caregiver1User._id,
+      clientName: 'Maria Johnson',
+      caregiverName: 'Ana Smith',
       description: 'Three visits in the past week have unsigned care plans.',
       assignedTo: 'Care Coordinator',
       dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -970,6 +980,8 @@ export async function seedDemoData(connection: Connection) {
       title: '2 caregivers with expired CPR certification',
       severity: 'high',
       status: 'in_progress',
+      caregiverId: caregiver2User._id,
+      caregiverName: 'Joseph Lee',
       description: 'Two caregivers CPR certifications expired last month.',
       assignedTo: 'HR Manager',
       dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -984,6 +996,11 @@ export async function seedDemoData(connection: Connection) {
       title: 'Incident report filed 4 hours late',
       severity: 'critical',
       status: 'resolved',
+      clientId: clients[1]._id,
+      visitId: todayVisits[7]._id,
+      caregiverId: userBySeedKey.get('caregiver8')!._id,
+      clientName: 'David Miller',
+      caregiverName: 'Peter Long',
       description: 'Report for incident was filed 4 hours past the 2-hour deadline.',
       assignedTo: 'Quality Assurance',
       dueDate: daysAgo(now, 5, 0, 0).toISOString().split('T')[0],
@@ -997,13 +1014,14 @@ export async function seedDemoData(connection: Connection) {
   await connection.collection('socialWorkCases').insertMany([
     {
       agencyId,
-      clientName: 'Eleanor Martinez',
-      clientId: new Types.ObjectId(),
-      assignedWorker: 'Social Worker A',
-      category: 'housing',
+      clientName: 'Maria Johnson',
+      clientId: clients[0]._id,
+      linkedConcernId: familyConcerns[1]._id,
+      assignedWorker: 'Marcus Social',
+      category: 'family',
       status: 'active',
-      description: 'Client at risk of losing housing due to non-payment.',
-      nextFollowUp: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      description: 'Emily Johnson reported Maria sounded more tired than usual. Coordinate family-safe follow-up.',
+      nextFollowUp: now.toISOString().split('T')[0],
       priority: 'urgent',
       deletedAt: null,
       createdAt: daysAgo(now, 5, 0, 0),
@@ -1013,6 +1031,7 @@ export async function seedDemoData(connection: Connection) {
       agencyId,
       clientName: 'George Patterson',
       clientId: new Types.ObjectId(),
+      linkedConcernId: null,
       assignedWorker: 'Social Worker B',
       category: 'benefits',
       status: 'pending_review',
@@ -1027,6 +1046,7 @@ export async function seedDemoData(connection: Connection) {
       agencyId,
       clientName: 'Frances Cooper',
       clientId: new Types.ObjectId(),
+      linkedConcernId: null,
       assignedWorker: 'Social Worker A',
       category: 'family',
       status: 'active',
@@ -1042,6 +1062,7 @@ export async function seedDemoData(connection: Connection) {
   await connection.collection('intakeRecords').insertMany([
     {
       agencyId,
+      branchId: northsideBranchId,
       clientName: 'Harold Jenkins',
       agentName: 'Intake Agent A',
       stage: 'assessment',
@@ -1057,6 +1078,7 @@ export async function seedDemoData(connection: Connection) {
     },
     {
       agencyId,
+      branchId: westviewBranchId,
       clientName: 'Sylvia Montgomery',
       agentName: 'Intake Agent B',
       stage: 'authorization',
@@ -1072,6 +1094,7 @@ export async function seedDemoData(connection: Connection) {
     },
     {
       agencyId,
+      branchId: northsideBranchId,
       clientName: 'Walter Hughes',
       agentName: 'Intake Agent A',
       stage: 'inquiry',

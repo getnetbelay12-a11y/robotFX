@@ -30,6 +30,7 @@ describe('mapNurseApproval', () => {
     caregiverName: 'Ana Smith',
     visitDate: '2026-05-26',
     visitType: 'Care note approval',
+    priority: 'high',
     status: 'pending_review',
     nurseNotes: 'Mobility observation needs review.',
     createdAt: NOW,
@@ -72,6 +73,12 @@ describe('mapNurseApproval', () => {
     expect(mapNurseApproval(raw).auditTrail).toEqual([]);
   });
 
+  it('maps priority from backend priority', () => {
+    expect(mapNurseApproval(raw).priority).toBe('High');
+    expect(mapNurseApproval({ ...raw, priority: 'critical' }).priority).toBe('Critical');
+    expect(mapNurseApproval({ ...raw, priority: 'low' }).priority).toBe('Low');
+  });
+
   it('sets nurseComments from nurseNotes when status is approved', () => {
     expect(mapNurseApproval({ ...raw, status: 'approved', nurseNotes: 'Looks good.' }).nurseComments).toBe('Looks good.');
   });
@@ -97,6 +104,11 @@ describe('mapInspectionFinding', () => {
     title: 'Checklist incomplete',
     severity: 'critical',
     status: 'open',
+    clientId: 'client-1',
+    visitId: 'visit-1',
+    caregiverId: 'caregiver-1',
+    clientName: 'Maria Johnson',
+    caregiverName: 'Ana Smith',
     description: 'One task not done.',
     assignedTo: 'Leah Morris',
     createdAt: NOW,
@@ -117,6 +129,20 @@ describe('mapInspectionFinding', () => {
 
   it('maps severity low to Info', () => {
     expect(mapInspectionFinding({ ...raw, severity: 'low' }).severity).toBe('Info');
+  });
+
+  it('maps severity compliance to Compliance', () => {
+    expect(mapInspectionFinding({ ...raw, severity: 'compliance' }).severity).toBe('Compliance');
+  });
+
+  it('maps linked record ids and names', () => {
+    const result = mapInspectionFinding(raw);
+    expect(result.clientId).toBe('client-1');
+    expect(result.visitId).toBe('visit-1');
+    expect(result.caregiverId).toBe('caregiver-1');
+    expect(result.clientName).toBe('Maria Johnson');
+    expect(result.caregiverName).toBe('Ana Smith');
+    expect(result.relatedType).toBe('Visit');
   });
 
   it('maps status open to Open', () => {
@@ -176,6 +202,10 @@ describe('mapInspectionRule', () => {
   it('maps severity high to Warning', () => {
     expect(mapInspectionRule({ ...raw, severity: 'high' }).severity).toBe('Warning');
   });
+
+  it('maps severity compliance to Compliance', () => {
+    expect(mapInspectionRule({ ...raw, severity: 'compliance' }).severity).toBe('Compliance');
+  });
 });
 
 describe('mapSocialWorkCase', () => {
@@ -184,6 +214,7 @@ describe('mapSocialWorkCase', () => {
     agencyId: 'ag-1',
     clientName: 'Maria Johnson',
     clientId: 'c-1',
+    linkedConcernId: 'concern-1',
     assignedWorker: 'user-social-worker',
     category: 'family',
     status: 'active',
@@ -243,12 +274,17 @@ describe('mapSocialWorkCase', () => {
     void _cid;
     expect(mapSocialWorkCase({ ...noClientId, clientId: undefined }).clientId).not.toBe('sw-1');
   });
+
+  it('maps linkedConcernId from raw.linkedConcernId', () => {
+    expect(mapSocialWorkCase(raw).linkedConcernId).toBe('concern-1');
+  });
 });
 
 describe('mapIntakeRecord', () => {
   const raw: BackendIntakeRecord = {
     _id: 'ir-1',
     agencyId: 'ag-1',
+    branchId: 'branch-1',
     clientName: 'Louise Grant',
     agentName: 'agent-1',
     stage: 'authorization',
@@ -288,6 +324,10 @@ describe('mapIntakeRecord', () => {
 
   it('maps priority urgent to High', () => {
     expect(mapIntakeRecord({ ...raw, priority: 'urgent' }).priority).toBe('High');
+  });
+
+  it('maps branchId from raw.branchId instead of agencyId', () => {
+    expect(mapIntakeRecord(raw).branchId).toBe('branch-1');
   });
 });
 

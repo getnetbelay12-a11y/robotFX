@@ -26,6 +26,9 @@ export class NurseApproval {
   @Prop({ required: true })
   visitType!: string;
 
+  @Prop({ required: true, enum: ['low', 'medium', 'high', 'critical'], default: 'medium' })
+  priority!: string;
+
   @Prop({
     required: true,
     enum: ['pending_review', 'approved', 'rejected', 'needs_clarification'],

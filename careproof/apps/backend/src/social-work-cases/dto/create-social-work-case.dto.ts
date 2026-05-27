@@ -8,6 +8,10 @@ export class CreateSocialWorkCaseDto {
   @IsOptional()
   clientId?: string;
 
+  @IsMongoId()
+  @IsOptional()
+  linkedConcernId?: string;
+
   @IsString()
   assignedWorker!: string;
 

@@ -28,6 +28,7 @@ export class IntakeRecordsService {
     requirePermission(actor.role, 'intake.write');
     const doc = await this.model.create({
       ...dto,
+      branchId: dto.branchId ? new Types.ObjectId(dto.branchId) : undefined,
       agencyId: new Types.ObjectId(actor.agencyId),
     });
     await this.auditService.log({

@@ -14,8 +14,23 @@ export class InspectionFinding {
   @Prop({ required: true })
   title!: string;
 
-  @Prop({ required: true, enum: ['critical', 'high', 'medium', 'low'] })
+  @Prop({ required: true, enum: ['critical', 'high', 'medium', 'low', 'compliance'] })
   severity!: string;
+
+  @Prop({ type: Types.ObjectId })
+  clientId!: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId })
+  visitId!: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId })
+  caregiverId!: Types.ObjectId;
+
+  @Prop()
+  clientName!: string;
+
+  @Prop()
+  caregiverName!: string;
 
   @Prop({ required: true, enum: ['open', 'in_progress', 'resolved', 'waived'] })
   status!: string;

@@ -615,8 +615,10 @@ export interface InspectionFinding {
   status: InspectionStatus;
   relatedType: 'Visit' | 'Client' | 'Caregiver' | 'Nurse' | 'Family Concern' | 'Billing' | 'Agency';
   clientId?: string;
+  clientName?: string;
   visitId?: string;
   caregiverId?: string;
+  caregiverName?: string;
   owner: string;
   openedAt: string;
   recommendedAction: string;
