@@ -76,6 +76,7 @@ import {
   decideNurseApprovalApi,
   fetchExpirationRecordsApi,
   fetchInspectionFindingsApi,
+  fetchInspectionRulesApi,
   fetchIntakeRecordsApi,
   fetchMedicalAvailabilityApi,
   fetchNurseApprovalsApi,
@@ -4845,19 +4846,19 @@ export function NotificationsCenterScreen() {
 }
 
 export function NurseApprovalsScreen() {
+  const [approvals, setApprovals] = useState(nurseApprovals);
   const [selectedId, setSelectedId] = useState(nurseApprovals[0]?.id ?? '');
   const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
   const [backendConnected, setBackendConnected] = useState(false);
-  const [backendCount, setBackendCount] = useState(0);
-  const selected = nurseApprovals.find((item) => item.id === selectedId) ?? nurseApprovals[0];
-  const visibleStatus = (item: typeof nurseApprovals[number]) => statusOverrides[item.id] ?? item.status;
-  const pending = nurseApprovals.filter((item) => !['Approved', 'Rejected'].includes(visibleStatus(item))).length;
-  const blocked = nurseApprovals.filter((item) => item.blocksFamilyVisibility && !['Approved', 'Rejected'].includes(visibleStatus(item))).length;
-  const highPriority = nurseApprovals.filter((item) => ['High', 'Critical'].includes(item.priority)).length;
+  const selected = approvals.find((item) => item.id === selectedId) ?? approvals[0];
+  const visibleStatus = (item: typeof approvals[number]) => statusOverrides[item.id] ?? item.status;
+  const pending = approvals.filter((item) => !['Approved', 'Rejected'].includes(visibleStatus(item))).length;
+  const blocked = approvals.filter((item) => item.blocksFamilyVisibility && !['Approved', 'Rejected'].includes(visibleStatus(item))).length;
+  const highPriority = approvals.filter((item) => ['High', 'Critical'].includes(item.priority)).length;
 
   useEffect(() => {
     fetchNurseApprovalsApi().then((data) => {
-      setBackendCount(data.length);
+      setApprovals(data);
       setBackendConnected(true);
     }).catch(() => {});
   }, []);
@@ -4870,7 +4871,7 @@ export function NurseApprovalsScreen() {
     >
 
         {backendConnected && (
-          <div className="mb-4 px-4 py-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">Live backend connected · {backendCount} records</div>
+          <div className="mb-4 px-4 py-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">Live backend connected · {approvals.length} records</div>
         )}
       <div className="statsGrid">
         <StatCard label="Pending approval" value={pending} tone={pending ? 'warning' : 'positive'} />
@@ -4882,8 +4883,8 @@ export function NurseApprovalsScreen() {
         <DashboardCard title="Approval queue">
           <DataTable
             columns={['Client', 'Type', 'Priority', 'Status', 'Assigned nurse', 'Submitted', 'Action']}
-            rows={nurseApprovals.map((approval) => [
-              getClient(approval.clientId)?.name ?? 'Client',
+            rows={approvals.map((approval) => [
+              getClient(approval.clientId)?.name ?? approval.clientId ?? 'Client',
               approval.approvalType,
               <StatusBadge key="priority" status={approval.priority} />,
               <StatusBadge key="status" status={visibleStatus(approval)} />,
@@ -4910,9 +4911,9 @@ export function NurseApprovalsScreen() {
                 <p>{selected.nurseComments ?? 'No decision comments yet.'}</p>
               </MetricCard>
               <div className="inlineActions">
-                <button type="button" className="button primaryButton" onClick={() => { setStatusOverrides((current) => ({ ...current, [selected.id]: 'Approved' })); decideNurseApprovalApi(selected.id, 'approved').catch(() => {}); }}>Approve</button>
-                <button type="button" className="button secondaryButton" onClick={() => { setStatusOverrides((current) => ({ ...current, [selected.id]: 'Changes Requested' })); decideNurseApprovalApi(selected.id, 'needs_clarification').catch(() => {}); }}>Request changes</button>
-                <button type="button" className="button ghostButton" onClick={() => { setStatusOverrides((current) => ({ ...current, [selected.id]: 'Rejected' })); decideNurseApprovalApi(selected.id, 'rejected').catch(() => {}); }}>Reject</button>
+                <button type="button" className="button primaryButton" onClick={async () => { setStatusOverrides((c) => ({ ...c, [selected.id]: 'Approved' })); try { const u = await decideNurseApprovalApi(selected.id, 'approved'); setApprovals((p) => p.map((a) => a.id === u.id ? u : a)); setStatusOverrides((c) => { const n = { ...c }; delete n[u.id]; return n; }); } catch {} }}>Approve</button>
+                <button type="button" className="button secondaryButton" onClick={async () => { setStatusOverrides((c) => ({ ...c, [selected.id]: 'Changes Requested' })); try { const u = await decideNurseApprovalApi(selected.id, 'needs_clarification'); setApprovals((p) => p.map((a) => a.id === u.id ? u : a)); setStatusOverrides((c) => { const n = { ...c }; delete n[u.id]; return n; }); } catch {} }}>Request changes</button>
+                <button type="button" className="button ghostButton" onClick={async () => { setStatusOverrides((c) => ({ ...c, [selected.id]: 'Rejected' })); try { const u = await decideNurseApprovalApi(selected.id, 'rejected'); setApprovals((p) => p.map((a) => a.id === u.id ? u : a)); setStatusOverrides((c) => { const n = { ...c }; delete n[u.id]; return n; }); } catch {} }}>Reject</button>
                 <button type="button" className="button ghostButton" onClick={() => setStatusOverrides((current) => ({ ...current, [selected.id]: 'Escalated' }))}>Escalate</button>
               </div>
               <Timeline items={selected.auditTrail} />
@@ -4925,25 +4926,29 @@ export function NurseApprovalsScreen() {
 }
 
 export function InspectionCenterScreen() {
+  const [findings, setFindings] = useState(inspectionFindings);
+  const [rules, setRules] = useState(inspectionRules);
   const [statuses, setStatuses] = useState<Record<string, string>>({});
   const [backendConnected, setBackendConnected] = useState(false);
-  const [backendCount, setBackendCount] = useState(0);
-  const visibleStatus = (finding: typeof inspectionFindings[number]) => statuses[finding.id] ?? finding.status;
-  const open = inspectionFindings.filter((item) => !['Resolved', 'Dismissed'].includes(visibleStatus(item))).length;
-  const compliance = inspectionFindings.filter((item) => item.severity === 'Compliance').length;
-  const critical = inspectionFindings.filter((item) => item.severity === 'Critical').length;
+  const visibleStatus = (finding: typeof findings[number]) => statuses[finding.id] ?? finding.status;
+  const open = findings.filter((item) => !['Resolved', 'Dismissed'].includes(visibleStatus(item))).length;
+  const compliance = findings.filter((item) => item.severity === 'Compliance').length;
+  const critical = findings.filter((item) => item.severity === 'Critical').length;
 
   useEffect(() => {
-    fetchInspectionFindingsApi().then((data) => {
-      setBackendCount(data.length);
-      setBackendConnected(true);
-    }).catch(() => {});
+    Promise.all([fetchInspectionFindingsApi(), fetchInspectionRulesApi()])
+      .then(([findingsData, rulesData]) => {
+        setFindings(findingsData);
+        setRules(rulesData);
+        setBackendConnected(true);
+      })
+      .catch(() => {});
   }, []);
 
   return (
     <AppShell title="Inspection center" subtitle="Automated inspection rules catch missing proof, overdue communication, compliance risk, and unsafe readiness gaps." navItems={consoleLinks}>
       {backendConnected && (
-        <div className="mb-4 px-4 py-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">Live backend connected · {backendCount} records</div>
+        <div className="mb-4 px-4 py-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">Live backend connected · {findings.length} findings</div>
       )}
       <div className="statsGrid">
         <StatCard label="Open findings" value={open} tone={open ? 'warning' : 'positive'} />
@@ -4955,23 +4960,23 @@ export function InspectionCenterScreen() {
         <DashboardCard title="Open findings">
           <DataTable
             columns={['Finding', 'Severity', 'Status', 'Linked record', 'Owner', 'Recommended action', 'Actions']}
-            rows={inspectionFindings.map((finding) => [
-              <div key="finding" className="tablePrimaryCell"><strong>{finding.title}</strong><span>{inspectionRules.find((rule) => rule.id === finding.ruleId)?.name}</span></div>,
+            rows={findings.map((finding) => [
+              <div key="finding" className="tablePrimaryCell"><strong>{finding.title}</strong><span>{rules.find((rule) => rule.id === finding.ruleId)?.name}</span></div>,
               <StatusBadge key="severity" status={finding.severity} />,
               <StatusBadge key="status" status={visibleStatus(finding)} />,
               finding.clientId ? getClient(finding.clientId)?.name : finding.caregiverId ? getCaregiver(finding.caregiverId)?.name : finding.relatedType,
               finding.owner,
               finding.recommendedAction,
               <div key="actions" className="inlineActions">
-                <button type="button" className="textAction" onClick={() => { setStatuses((current) => ({ ...current, [finding.id]: 'Acknowledged' })); updateFindingStatusApi(finding.id, 'in_progress').catch(() => {}); }}>Acknowledge</button>
-                <button type="button" className="textAction" onClick={() => { setStatuses((current) => ({ ...current, [finding.id]: 'Resolved' })); updateFindingStatusApi(finding.id, 'resolved').catch(() => {}); }}>Resolve</button>
+                <button type="button" className="textAction" onClick={async () => { setStatuses((c) => ({ ...c, [finding.id]: 'Acknowledged' })); try { const u = await updateFindingStatusApi(finding.id, 'in_progress'); setFindings((p) => p.map((f) => f.id === u.id ? u : f)); setStatuses((c) => { const n = { ...c }; delete n[u.id]; return n; }); } catch {} }}>Acknowledge</button>
+                <button type="button" className="textAction" onClick={async () => { setStatuses((c) => ({ ...c, [finding.id]: 'Resolved' })); try { const u = await updateFindingStatusApi(finding.id, 'resolved'); setFindings((p) => p.map((f) => f.id === u.id ? u : f)); setStatuses((c) => { const n = { ...c }; delete n[u.id]; return n; }); } catch {} }}>Resolve</button>
               </div>,
             ])}
           />
         </DashboardCard>
         <DashboardCard title="Inspection rules">
           <div className="stackGrid">
-            {inspectionRules.map((rule) => (
+            {rules.map((rule) => (
               <div key={rule.id} className="miniSummaryCard">
                 <div className="aiRiskSignalTop">
                   <strong>{rule.name}</strong>
@@ -4989,17 +4994,17 @@ export function InspectionCenterScreen() {
 }
 
 export function SocialWorkScreen() {
+  const [cases, setCases] = useState(socialWorkCases);
   const [caseStatuses, setCaseStatuses] = useState<Record<string, string>>({});
   const [backendConnected, setBackendConnected] = useState(false);
-  const [backendCount, setBackendCount] = useState(0);
-  const visibleStatus = (item: typeof socialWorkCases[number]) => caseStatuses[item.id] ?? item.status;
-  const open = socialWorkCases.filter((item) => visibleStatus(item) !== 'Closed').length;
-  const highRisk = socialWorkCases.filter((item) => ['High', 'Critical'].includes(item.riskLevel)).length;
-  const followUps = socialWorkCases.filter((item) => item.nextFollowUpDate.includes('Today')).length;
+  const visibleStatus = (item: typeof cases[number]) => caseStatuses[item.id] ?? item.status;
+  const open = cases.filter((item) => visibleStatus(item) !== 'Closed').length;
+  const highRisk = cases.filter((item) => ['High', 'Critical'].includes(item.riskLevel)).length;
+  const followUps = cases.filter((item) => item.nextFollowUpDate.includes('Today')).length;
 
   useEffect(() => {
     fetchSocialWorkCasesApi().then((data) => {
-      setBackendCount(data.length);
+      setCases(data);
       setBackendConnected(true);
     }).catch(() => {});
   }, []);
@@ -5007,17 +5012,17 @@ export function SocialWorkScreen() {
   return (
     <AppShell title="Social work" subtitle="Track family concerns, well-being signals, support needs, and family-safe responses without exposing internal notes." navItems={consoleLinks}>
       {backendConnected && (
-        <div className="mb-4 px-4 py-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">Live backend connected · {backendCount} records</div>
+        <div className="mb-4 px-4 py-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">Live backend connected · {cases.length} records</div>
       )}
       <div className="statsGrid">
         <StatCard label="Open cases" value={open} tone={open ? 'warning' : 'positive'} />
         <StatCard label="High-risk cases" value={highRisk} tone={highRisk ? 'danger' : 'neutral'} />
         <StatCard label="Follow-ups due today" value={followUps} tone={followUps ? 'warning' : 'neutral'} />
-        <StatCard label="Linked family concerns" value={socialWorkCases.filter((item) => item.linkedConcernId).length} tone="info" />
+        <StatCard label="Linked family concerns" value={cases.filter((item) => item.linkedConcernId).length} tone="info" />
       </div>
       <DataTable
         columns={['Client', 'Case type', 'Risk', 'Status', 'Social worker', 'Next follow-up', 'Family-safe response', 'Actions']}
-        rows={socialWorkCases.map((item) => [
+        rows={cases.map((item) => [
           getClient(item.clientId)?.name,
           item.caseType,
           <StatusBadge key="risk" status={item.riskLevel} />,
@@ -5026,8 +5031,8 @@ export function SocialWorkScreen() {
           item.nextFollowUpDate,
           item.familySafeResponse ?? 'Draft response required',
           <div key="actions" className="inlineActions">
-            <button type="button" className="textAction" onClick={() => { setCaseStatuses((current) => ({ ...current, [item.id]: 'Escalated' })); updateSocialWorkCaseStatusApi(item.id, 'escalated').catch(() => {}); }}>Escalate</button>
-            <button type="button" className="textAction" onClick={() => { setCaseStatuses((current) => ({ ...current, [item.id]: 'Closed' })); updateSocialWorkCaseStatusApi(item.id, 'closed').catch(() => {}); }}>Close case</button>
+            <button type="button" className="textAction" onClick={async () => { setCaseStatuses((c) => ({ ...c, [item.id]: 'Escalated' })); try { const u = await updateSocialWorkCaseStatusApi(item.id, 'escalated'); setCases((p) => p.map((c2) => c2.id === u.id ? u : c2)); setCaseStatuses((c) => { const n = { ...c }; delete n[u.id]; return n; }); } catch {} }}>Escalate</button>
+            <button type="button" className="textAction" onClick={async () => { setCaseStatuses((c) => ({ ...c, [item.id]: 'Closed' })); try { const u = await updateSocialWorkCaseStatusApi(item.id, 'closed'); setCases((p) => p.map((c2) => c2.id === u.id ? u : c2)); setCaseStatuses((c) => { const n = { ...c }; delete n[u.id]; return n; }); } catch {} }}>Close case</button>
           </div>,
         ])}
       />
@@ -5036,9 +5041,9 @@ export function SocialWorkScreen() {
 }
 
 export function IntakeAgentsScreen() {
+  const [records, setRecords] = useState(intakeRecords);
   const [backendConnected, setBackendConnected] = useState(false);
-  const [backendCount, setBackendCount] = useState(0);
-  const stageCounts = intakeRecords.reduce<Record<string, number>>((acc, item) => {
+  const stageCounts = records.reduce<Record<string, number>>((acc, item) => {
     acc[item.stage] = (acc[item.stage] ?? 0) + 1;
     return acc;
   }, {});
@@ -5046,7 +5051,7 @@ export function IntakeAgentsScreen() {
 
   useEffect(() => {
     fetchIntakeRecordsApi().then((data) => {
-      setBackendCount(data.length);
+      setRecords(data);
       setBackendConnected(true);
     }).catch(() => {});
   }, []);
@@ -5054,7 +5059,7 @@ export function IntakeAgentsScreen() {
   return (
     <AppShell title="Intake / agents" subtitle="Track referrals from first contact through documents, assessment, nurse approval, and ready-for-scheduling handoff." navItems={consoleLinks}>
       {backendConnected && (
-        <div className="mb-4 px-4 py-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">Live backend connected · {backendCount} records</div>
+        <div className="mb-4 px-4 py-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">Live backend connected · {records.length} records</div>
       )}
       <div className="statsGrid">
         <StatCard label="New referrals" value={stageCounts['New Referral'] ?? 0} tone="info" />
@@ -5068,7 +5073,7 @@ export function IntakeAgentsScreen() {
           {activeStages.map(([stage]) => (
             <div key={stage} className="kanbanColumn kanbanColumn-neutral">
               <div className="kanbanHeader"><strong>{stage}</strong><span className="kanbanBadge">{stageCounts[stage]}</span></div>
-              {intakeRecords.filter((item) => item.stage === stage).map((item) => (
+              {records.filter((item) => item.stage === stage).map((item) => (
                 <div key={item.id} className="visitCard">
                   <div className="visitCardTop"><strong>{item.prospectName}</strong><StatusBadge status={item.priority} /></div>
                   <p>{item.requiredServices.join(', ')}</p>
@@ -5082,7 +5087,7 @@ export function IntakeAgentsScreen() {
       <DashboardCard title="Intake records">
         <DataTable
           columns={['Prospect', 'Referral source', 'Agent', 'Branch', 'Payer', 'Documents', 'Nurse approval', 'Next action']}
-          rows={intakeRecords.map((item) => [
+          rows={records.map((item) => [
             item.prospectName,
             item.referralSource,
             users.find((user) => user.id === item.assignedAgentId)?.name,
@@ -5099,15 +5104,15 @@ export function IntakeAgentsScreen() {
 }
 
 export function MedicalAvailabilityScreen() {
+  const [medRecords, setMedRecords] = useState(medicalAvailabilityRecords);
   const [backendConnected, setBackendConnected] = useState(false);
-  const [backendCount, setBackendCount] = useState(0);
-  const blocked = medicalAvailabilityRecords.filter((item) => item.blocksVisit).length;
-  const missing = medicalAvailabilityRecords.filter((item) => ['Missing', 'Expired'].includes(item.status)).length;
-  const needsConfirmation = medicalAvailabilityRecords.filter((item) => item.status === 'Needs Confirmation').length;
+  const blocked = medRecords.filter((item) => item.blocksVisit).length;
+  const missing = medRecords.filter((item) => ['Missing', 'Expired'].includes(item.status)).length;
+  const needsConfirmation = medRecords.filter((item) => item.status === 'Needs Confirmation').length;
 
   useEffect(() => {
     fetchMedicalAvailabilityApi().then((data) => {
-      setBackendCount(data.length);
+      setMedRecords(data);
       setBackendConnected(true);
     }).catch(() => {});
   }, []);
@@ -5115,17 +5120,17 @@ export function MedicalAvailabilityScreen() {
   return (
     <AppShell title="Medical availability" subtitle="Confirm staff, supplies, medication, equipment, transportation, backup coverage, and emergency contacts before visits are treated as ready." navItems={consoleLinks}>
       {backendConnected && (
-        <div className="mb-4 px-4 py-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">Live backend connected · {backendCount} records</div>
+        <div className="mb-4 px-4 py-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">Live backend connected · {medRecords.length} records</div>
       )}
       <div className="statsGrid">
         <StatCard label="Visits blocked" value={blocked} tone={blocked ? 'danger' : 'positive'} />
         <StatCard label="Missing availability" value={missing} tone={missing ? 'danger' : 'neutral'} />
         <StatCard label="Needs confirmation" value={needsConfirmation} tone={needsConfirmation ? 'warning' : 'neutral'} />
-        <StatCard label="Staff coverage gaps" value={medicalAvailabilityRecords.filter((item) => item.type.includes('availability') || item.type === 'Backup caregiver').length} tone="info" />
+        <StatCard label="Staff coverage gaps" value={medRecords.filter((item) => item.type.includes('availability') || item.type === 'Backup caregiver').length} tone="info" />
       </div>
       <DataTable
         columns={['Client / Visit', 'Availability type', 'Status', 'Owner', 'Detail', 'Next action', 'Blocks visit']}
-        rows={medicalAvailabilityRecords.map((item) => [
+        rows={medRecords.map((item) => [
           item.clientId ? getClient(item.clientId)?.name : 'Agency',
           item.type,
           <StatusBadge key="status" status={item.status} />,
@@ -5141,15 +5146,15 @@ export function MedicalAvailabilityScreen() {
 
 export function ExpirationCenterScreen() {
   const { showToast } = useDemoStore();
+  const [expRecords, setExpRecords] = useState(expirationRecords);
   const [backendConnected, setBackendConnected] = useState(false);
-  const [backendCount, setBackendCount] = useState(0);
-  const expiring30 = expirationRecords.filter((item) => item.state === 'Expiring in 30 days').length;
-  const expiring7 = expirationRecords.filter((item) => item.state === 'Expiring in 7 days').length;
-  const blockers = expirationRecords.filter((item) => item.blocksVisits || ['Expired', 'Missing', 'Blocker'].includes(item.state)).length;
+  const expiring30 = expRecords.filter((item) => item.state === 'Expiring in 30 days').length;
+  const expiring7 = expRecords.filter((item) => item.state === 'Expiring in 7 days').length;
+  const blockers = expRecords.filter((item) => item.blocksVisits || ['Expired', 'Missing', 'Blocker'].includes(item.state)).length;
 
   useEffect(() => {
     fetchExpirationRecordsApi().then((data) => {
-      setBackendCount(data.length);
+      setExpRecords(data);
       setBackendConnected(true);
     }).catch(() => {});
   }, []);
@@ -5157,17 +5162,17 @@ export function ExpirationCenterScreen() {
   return (
     <AppShell title="Expiration center" subtitle="Track licenses, checks, certifications, care plans, authorizations, consents, agency reviews, and blockers before they disrupt care." navItems={consoleLinks}>
       {backendConnected && (
-        <div className="mb-4 px-4 py-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">Live backend connected · {backendCount} records</div>
+        <div className="mb-4 px-4 py-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">Live backend connected · {expRecords.length} records</div>
       )}
       <div className="statsGrid">
         <StatCard label="Expiring in 30 days" value={expiring30} tone={expiring30 ? 'warning' : 'neutral'} />
         <StatCard label="Expiring in 7 days" value={expiring7} tone={expiring7 ? 'danger' : 'neutral'} />
         <StatCard label="Expired / missing blockers" value={blockers} tone={blockers ? 'danger' : 'positive'} />
-        <StatCard label="Visits blocked" value={expirationRecords.filter((item) => item.blocksVisits).length} tone="danger" />
+        <StatCard label="Visits blocked" value={expRecords.filter((item) => item.blocksVisits).length} tone="danger" />
       </div>
       <DataTable
         columns={['Owner', 'Category', 'Item', 'Expiration', 'State', 'Responsible owner', 'Renewal status', 'Actions']}
-        rows={expirationRecords.map((item) => [
+        rows={expRecords.map((item) => [
           item.ownerName,
           item.category,
           item.item,
@@ -5176,14 +5181,14 @@ export function ExpirationCenterScreen() {
           item.responsibleOwner,
           item.renewalStatus,
           <div key="actions" className="inlineActions">
-            <button type="button" className="textAction" onClick={() => { showToast('Renewal action recorded in demo mode.'); updateRenewalStatusApi(item.id, 'renewed').catch(() => {}); }}>Renewal action</button>
+            <button type="button" className="textAction" onClick={async () => { showToast('Renewal action recorded.'); try { const u = await updateRenewalStatusApi(item.id, 'renewed'); setExpRecords((p) => p.map((r) => r.id === u.id ? u : r)); } catch {} }}>Renewal action</button>
             <button type="button" className="textAction" onClick={() => showToast('Notification draft generated. Human confirmation required before sending.')}>Notify staff</button>
           </div>,
         ])}
       />
       <DashboardCard title="Notification drafts">
         <div className="stackGrid">
-          {expirationRecords.filter((item) => item.state !== 'Valid').map((item) => (
+          {expRecords.filter((item) => item.state !== 'Valid').map((item) => (
             <div key={item.id} className="miniSummaryCard">
               <div className="aiRiskSignalTop"><strong>{item.item}</strong><StatusBadge status={item.state} /></div>
               <p>{item.notificationDraft}</p>

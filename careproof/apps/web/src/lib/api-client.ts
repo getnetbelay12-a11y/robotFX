@@ -18,6 +18,24 @@ import type {
   SocialWorkCase,
   Visit,
 } from '../types/careproof';
+import {
+  mapExpirationRecord,
+  mapInspectionFinding,
+  mapInspectionRule,
+  mapIntakeRecord,
+  mapMedicalAvailability,
+  mapNurseApproval,
+  mapSocialWorkCase,
+} from './api-mappers';
+import type {
+  BackendExpirationRecord,
+  BackendInspectionFinding,
+  BackendInspectionRule,
+  BackendIntakeRecord,
+  BackendMedicalAvailability,
+  BackendNurseApproval,
+  BackendSocialWorkCase,
+} from './api-types';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL
@@ -561,88 +579,101 @@ export async function getIntegrationsApi() {
   return callProtectedApi<IntegrationCardPayload[]>('owner', '/system/integrations', { cache: 'no-store' });
 }
 
-export async function fetchNurseApprovalsApi() {
-  return callProtectedApi<NurseApproval[]>('owner', '/nurse-approvals');
+export async function fetchNurseApprovalsApi(): Promise<NurseApproval[]> {
+  const raw = await callProtectedApi<BackendNurseApproval[]>('owner', '/nurse-approvals');
+  return raw.map(mapNurseApproval);
 }
 
 export async function decideNurseApprovalApi(
   id: string,
   decision: 'approved' | 'rejected' | 'needs_clarification',
   nurseNotes?: string,
-) {
-  return callProtectedApi<NurseApproval>('owner', `/nurse-approvals/${id}/decide`, {
+): Promise<NurseApproval> {
+  const raw = await callProtectedApi<BackendNurseApproval>('owner', `/nurse-approvals/${id}/decide`, {
     method: 'PATCH',
     body: JSON.stringify({ decision, nurseNotes }),
   });
+  return mapNurseApproval(raw);
 }
 
-export async function fetchInspectionRulesApi() {
-  return callProtectedApi<InspectionRule[]>('owner', '/inspection-findings/rules');
+export async function fetchInspectionRulesApi(): Promise<InspectionRule[]> {
+  const raw = await callProtectedApi<BackendInspectionRule[]>('owner', '/inspection-findings/rules');
+  return raw.map(mapInspectionRule);
 }
 
-export async function fetchInspectionFindingsApi() {
-  return callProtectedApi<InspectionFinding[]>('owner', '/inspection-findings');
+export async function fetchInspectionFindingsApi(): Promise<InspectionFinding[]> {
+  const raw = await callProtectedApi<BackendInspectionFinding[]>('owner', '/inspection-findings');
+  return raw.map(mapInspectionFinding);
 }
 
 export async function updateFindingStatusApi(
   id: string,
   status: 'open' | 'in_progress' | 'resolved' | 'waived',
-) {
-  return callProtectedApi<InspectionFinding>('owner', `/inspection-findings/${id}/status`, {
+): Promise<InspectionFinding> {
+  const raw = await callProtectedApi<BackendInspectionFinding>('owner', `/inspection-findings/${id}/status`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
   });
+  return mapInspectionFinding(raw);
 }
 
-export async function fetchSocialWorkCasesApi() {
-  return callProtectedApi<SocialWorkCase[]>('owner', '/social-work-cases');
+export async function fetchSocialWorkCasesApi(): Promise<SocialWorkCase[]> {
+  const raw = await callProtectedApi<BackendSocialWorkCase[]>('owner', '/social-work-cases');
+  return raw.map(mapSocialWorkCase);
 }
 
 export async function updateSocialWorkCaseStatusApi(
   id: string,
   status: 'active' | 'pending_review' | 'closed' | 'escalated',
-) {
-  return callProtectedApi<SocialWorkCase>('owner', `/social-work-cases/${id}/status`, {
+): Promise<SocialWorkCase> {
+  const raw = await callProtectedApi<BackendSocialWorkCase>('owner', `/social-work-cases/${id}/status`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
   });
+  return mapSocialWorkCase(raw);
 }
 
-export async function fetchIntakeRecordsApi() {
-  return callProtectedApi<IntakeRecord[]>('owner', '/intake-records');
+export async function fetchIntakeRecordsApi(): Promise<IntakeRecord[]> {
+  const raw = await callProtectedApi<BackendIntakeRecord[]>('owner', '/intake-records');
+  return raw.map(mapIntakeRecord);
 }
 
-export async function updateIntakeStageApi(id: string, stage: string) {
-  return callProtectedApi<IntakeRecord>('owner', `/intake-records/${id}/stage`, {
+export async function updateIntakeStageApi(id: string, stage: string): Promise<IntakeRecord> {
+  const raw = await callProtectedApi<BackendIntakeRecord>('owner', `/intake-records/${id}/stage`, {
     method: 'PATCH',
     body: JSON.stringify({ stage }),
   });
+  return mapIntakeRecord(raw);
 }
 
-export async function fetchMedicalAvailabilityApi() {
-  return callProtectedApi<MedicalAvailabilityRecord[]>('owner', '/medical-availability');
+export async function fetchMedicalAvailabilityApi(): Promise<MedicalAvailabilityRecord[]> {
+  const raw = await callProtectedApi<BackendMedicalAvailability[]>('owner', '/medical-availability');
+  return raw.map(mapMedicalAvailability);
 }
 
 export async function updateMedicalAvailabilityStatusApi(
   id: string,
   status: 'confirmed' | 'pending' | 'unavailable' | 'on_hold',
-) {
-  return callProtectedApi<MedicalAvailabilityRecord>('owner', `/medical-availability/${id}/status`, {
+): Promise<MedicalAvailabilityRecord> {
+  const raw = await callProtectedApi<BackendMedicalAvailability>('owner', `/medical-availability/${id}/status`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
   });
+  return mapMedicalAvailability(raw);
 }
 
-export async function fetchExpirationRecordsApi() {
-  return callProtectedApi<ExpirationRecord[]>('owner', '/expiration-records');
+export async function fetchExpirationRecordsApi(): Promise<ExpirationRecord[]> {
+  const raw = await callProtectedApi<BackendExpirationRecord[]>('owner', '/expiration-records');
+  return raw.map(mapExpirationRecord);
 }
 
 export async function updateRenewalStatusApi(
   id: string,
   status: 'current' | 'expiring_soon' | 'expired' | 'renewed',
-) {
-  return callProtectedApi<ExpirationRecord>('owner', `/expiration-records/${id}/renewal-status`, {
+): Promise<ExpirationRecord> {
+  const raw = await callProtectedApi<BackendExpirationRecord>('owner', `/expiration-records/${id}/renewal-status`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
   });
+  return mapExpirationRecord(raw);
 }
