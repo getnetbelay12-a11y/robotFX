@@ -621,6 +621,7 @@ export function StatusBadge({ status }: { status: VisitStatus | Incident['status
     'Expiring in 30 days': 'warning',
     'Expiring in 7 days': 'danger',
     Blocker: 'danger',
+    Blocked: 'danger',
     Complete: 'success',
     Pending: 'warning',
   };
@@ -1040,6 +1041,10 @@ export function PricingPageScreen() {
 }
 
 export { ConsoleDashboardScreen } from './features/dashboard/console-dashboard-screen';
+
+export { VisitBlockersScreen } from './features/operations/visit-blockers-screen';
+
+export { ConsoleFamilyUpdatesScreen } from './features/family/family-updates-screen';
 
 export { VisitsScreen } from './features/visits/visits-screen';
 

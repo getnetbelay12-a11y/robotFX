@@ -111,7 +111,7 @@ export function ConsoleDashboardScreen() {
       owner: item.owner || 'Coordinator',
       due: item.openedAt,
       nextAction: item.recommendedAction,
-      href: '/console/inspection-center',
+      href: '/console/inspections',
     }));
   const expirationRows = expirationRecords
     .filter((item) => item.blocksVisits || ['Expired', 'Missing', 'Blocker', 'Expiring in 7 days', 'Expiring in 30 days'].includes(item.state))
@@ -139,8 +139,8 @@ export function ConsoleDashboardScreen() {
       nextAction: 'Draft family-safe response and separate internal notes.',
       href: '/console/family-concerns',
     }));
-  const safetyRows = [...visitBlockers, ...medicationRows, ...approvalRows, ...inspectionRows, ...expirationRows, ...familyRows]
-    .slice(0, 10);
+  const allSafetyRows = [...visitBlockers, ...medicationRows, ...approvalRows, ...inspectionRows, ...expirationRows, ...familyRows];
+  const safetyRows = allSafetyRows.slice(0, 10);
   const familyWaiting = familyRows.length + nurseApprovals.filter((item) => item.blocksFamilyVisibility && !['Approved', 'Rejected'].includes(item.status)).length;
   const lateTone = (late === 0 ? 'neutral' : 'danger') as 'neutral' | 'danger';
   const missedTone = (missed === 0 ? 'neutral' : 'danger') as 'neutral' | 'danger';
@@ -215,22 +215,29 @@ export function ConsoleDashboardScreen() {
 
       <DashboardCard title="Today Safety Board">
         <div className="statsGrid proofStatsGrid">
-          <StatCard label="Unsafe today" value={safetyRows.length} tone={safetyRows.length ? 'danger' : 'positive'} />
-          <StatCard label="Visits blocked" value={visitBlockers.length + medicalBlockers} tone={visitBlockers.length + medicalBlockers ? 'danger' : 'positive'} href="/console/operations" />
+          <StatCard label="Unsafe today" value={allSafetyRows.length} tone={allSafetyRows.length ? 'danger' : 'positive'} />
+          <StatCard label="Visits blocked" value={visitBlockers.length + medicalBlockers} tone={visitBlockers.length + medicalBlockers ? 'danger' : 'positive'} href="/console/visit-blockers" />
           <StatCard label="Medications expired / low" value={medicationRisks.filter((item) => ['Expired', 'Low Stock', 'Missing', 'Order Expired'].includes(item.status)).length} tone={medicationRisks.length ? 'danger' : 'positive'} href="/console/medications" />
-          <StatCard label="Family waiting" value={familyWaiting} tone={familyWaiting ? 'warning' : 'positive'} href="/console/family-health" />
+          <StatCard label="Family waiting" value={familyWaiting} tone={familyWaiting ? 'warning' : 'positive'} href="/console/family-updates?status=waiting" />
         </div>
         <DataTable
           columns={['Client', 'Visit', 'Risk', 'Blocker', 'Owner', 'Due', 'Next Action']}
-          rows={safetyRows.map((item) => [
-            item.client,
-            item.visit,
-            <StatusBadge key="risk" status={item.risk} />,
-            item.blocker,
-            item.owner,
-            item.due,
-            <Link key="action" className="textAction" href={item.href}>{item.nextAction}</Link>,
-          ])}
+          rows={safetyRows.map((item) => {
+            const risk = item.risk as string;
+            const isCritical = risk === 'Critical' || risk === 'Expired' || risk === 'Missing' || risk === 'Blocked';
+            const isHigh = risk === 'High' || risk === 'Expiring in 7 days';
+            return [
+              <div key="client" className={isCritical ? 'tablePrimaryCell tableRowCritical' : isHigh ? 'tablePrimaryCell tableRowHigh' : 'tablePrimaryCell'}>
+                <strong>{item.client}</strong>
+              </div>,
+              item.visit,
+              <StatusBadge key="risk" status={item.risk} />,
+              <div key="blocker" className="tablePrimaryCell"><span>{item.blocker}</span></div>,
+              item.owner,
+              item.due,
+              <Link key="action" className="button secondaryButton" href={item.href}>{item.nextAction}</Link>,
+            ];
+          })}
         />
       </DashboardCard>
 
@@ -241,7 +248,7 @@ export function ConsoleDashboardScreen() {
             <li>{medicationRisks.filter((item) => item.status === 'Low Stock' || item.status === 'Missing').length} low-stock or missing medication blockers</li>
             <li>{medicationRisks.filter((item) => item.isHighRisk || item.requiresNurseReview).length} high-risk nurse review items</li>
           </ul>
-          <Link className="button secondaryButton" href="/console/medications">Open medication queue</Link>
+          <Link className="button secondaryButton" href="/console/medications?filter=risk">Open medication queue</Link>
         </DashboardCard>
         <DashboardCard title="Visit Blockers">
           <ul className="featureList">
@@ -249,7 +256,7 @@ export function ConsoleDashboardScreen() {
             <li>{medicalAvailabilityRecords.filter((item) => item.blocksVisit).length} medical availability blockers</li>
             <li>{todayVisits.filter((visit) => !visit.careNote && visit.checkOutTime).length} checked-out visits missing notes</li>
           </ul>
-          <Link className="button secondaryButton" href="/console/operations">Open operations</Link>
+          <Link className="button secondaryButton" href="/console/visit-blockers">Open visit blockers</Link>
         </DashboardCard>
         <DashboardCard title="Nurse Approval Queue">
           <ul className="featureList">
@@ -270,7 +277,7 @@ export function ConsoleDashboardScreen() {
             ))}
             {!inspectionRows.length ? <li>No open inspection findings.</li> : null}
           </ul>
-          <Link className="button secondaryButton" href="/console/inspection-center">Open findings</Link>
+          <Link className="button secondaryButton" href="/console/inspections">Open findings</Link>
         </DashboardCard>
         <DashboardCard title="Expiration / Compliance Preview">
           <ul className="featureList">
@@ -291,7 +298,7 @@ export function ConsoleDashboardScreen() {
             ))}
             {!familyRows.length && !approvalRows.some((item) => item.nextAction.includes('family update')) ? <li>No family updates waiting.</li> : null}
           </ul>
-          <Link className="button secondaryButton" href="/console/family-health">Open family health</Link>
+          <Link className="button secondaryButton" href="/console/family-updates?status=waiting">Open family updates</Link>
         </DashboardCard>
       </div>
 
