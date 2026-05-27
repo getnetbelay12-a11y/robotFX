@@ -57,11 +57,10 @@ function filterToQuery(filter: MedicationSupplyFilter) {
   return map[filter];
 }
 
-export function MedicationManagementScreen() {
-  const [activeFilter, setActiveFilter] = useState<MedicationSupplyFilter>(() =>
-    filterFromQuery(typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('filter') : null),
-  );
+export function MedicationManagementScreen({ initialFilter }: { initialFilter?: string | null }) {
+  const [selectedFilter, setSelectedFilter] = useState<MedicationSupplyFilter>(() => filterFromQuery(initialFilter ?? null));
   const [search, setSearch] = useState('');
+  const activeFilter = selectedFilter;
 
   const summary = useMemo(() => medicationSupplySummary(medicationSupplyRecords), []);
   const visibleRecords = useMemo(
@@ -70,7 +69,7 @@ export function MedicationManagementScreen() {
   );
 
   const setFilter = (filter: MedicationSupplyFilter) => {
-    setActiveFilter(filter);
+    setSelectedFilter(filter);
     const query = filterToQuery(filter);
     window.history.replaceState(null, '', query === 'all' ? '/console/medications' : `/console/medications?filter=${query}`);
   };

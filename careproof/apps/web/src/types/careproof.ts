@@ -744,3 +744,42 @@ export interface MedicationRecord {
   nextAction: string;
   blocksVisit: boolean;
 }
+
+export type MedicationSupplyCategory =
+  | 'Medication'
+  | 'Wound Care'
+  | 'Diabetes Supply'
+  | 'PPE'
+  | 'Mobility Aid'
+  | 'Nutrition'
+  | 'Other';
+
+export type MedicationSupplyStatus =
+  | 'Available'
+  | 'Low Stock'
+  | 'Expiring Soon'
+  | 'Expired'
+  | 'Missing'
+  | 'Needs Nurse Review'
+  | 'Blocked';
+
+export type MedicationSupplyRiskLevel = 'Critical' | 'High' | 'Medium' | 'Low';
+
+export interface MedicationSupplyRecord {
+  id: string;
+  clientId: string;
+  clientName: string;
+  visitId?: string;
+  itemName: string;
+  category: MedicationSupplyCategory;
+  quantityAvailable: number;
+  minimumRequired: number;
+  unit: string;
+  expirationDate: string;
+  assignedOwner: string;
+  lastChecked: string;
+  nurseReviewRequired?: boolean;
+  criticalForCare?: boolean;
+  blocksCare?: boolean;
+  notes?: string;
+}
