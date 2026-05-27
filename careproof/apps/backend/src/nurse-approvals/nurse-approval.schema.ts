@@ -11,6 +11,9 @@ export class NurseApproval {
   @Prop({ type: Types.ObjectId, required: true })
   visitId!: Types.ObjectId;
 
+  @Prop({ type: Types.ObjectId, default: null, index: true })
+  caregiverId!: Types.ObjectId | null;
+
   @Prop({ required: true })
   clientName!: string;
 

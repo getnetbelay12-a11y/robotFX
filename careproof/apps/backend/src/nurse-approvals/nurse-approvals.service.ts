@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { NurseApproval, NurseApprovalDocument } from './nurse-approval.schema';
@@ -7,6 +7,8 @@ import { DecideNurseApprovalDto } from './dto/decide-nurse-approval.dto';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/types';
 import { requirePermission } from '../auth/permissions';
+import { canAccessNurseApproval } from '../auth/scope';
+import { UserRole } from '../users/user.schema';
 
 @Injectable()
 export class NurseApprovalsService {
@@ -18,10 +20,21 @@ export class NurseApprovalsService {
 
   async list(actor: AuthUser) {
     requirePermission(actor.role, 'nurse_approval.read');
-    return this.model
-      .find({ agencyId: new Types.ObjectId(actor.agencyId), deletedAt: null })
-      .sort({ createdAt: -1 })
-      .lean();
+    const filter: Record<string, unknown> = {
+      agencyId: new Types.ObjectId(actor.agencyId),
+      deletedAt: null,
+    };
+    if (actor.role === UserRole.CAREGIVER) {
+      // CAREGIVERs only see approvals for their own visits
+      filter.caregiverId = new Types.ObjectId(actor.sub);
+    } else if (actor.role === UserRole.NURSE) {
+      // NURSEs see pending records they can pick up, plus records they've reviewed
+      filter.$or = [
+        { status: 'pending_review', reviewedBy: null },
+        { reviewedBy: new Types.ObjectId(actor.sub) },
+      ];
+    }
+    return this.model.find(filter).sort({ createdAt: -1 }).lean();
   }
 
   async create(actor: AuthUser, dto: CreateNurseApprovalDto) {
@@ -29,6 +42,7 @@ export class NurseApprovalsService {
     const doc = await this.model.create({
       ...dto,
       visitId: new Types.ObjectId(dto.visitId),
+      caregiverId: dto.caregiverId ? new Types.ObjectId(dto.caregiverId) : null,
       agencyId: new Types.ObjectId(actor.agencyId),
       status: 'pending_review',
     });
@@ -48,6 +62,9 @@ export class NurseApprovalsService {
       .findOne({ _id: new Types.ObjectId(id), agencyId: new Types.ObjectId(actor.agencyId), deletedAt: null })
       .lean();
     if (!doc) throw new NotFoundException('Nurse approval not found');
+    if (!canAccessNurseApproval(actor, doc.caregiverId, doc.reviewedBy)) {
+      throw new ForbiddenException('You do not have access to this nurse approval');
+    }
     return doc;
   }
 

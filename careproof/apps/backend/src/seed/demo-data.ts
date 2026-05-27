@@ -881,12 +881,16 @@ export async function seedDemoData(connection: Connection) {
 
   const coordinatorUser = userBySeedKey.get('coordinator')!;
 
+  const caregiver1User = userBySeedKey.get('caregiver1')!;
+  const caregiver2User = userBySeedKey.get('caregiver2')!;
+
   await connection.collection('nurseApprovals').insertMany([
     {
       agencyId,
       visitId: new Types.ObjectId(),
+      caregiverId: caregiver1User._id,
       clientName: 'Maria Johnson',
-      caregiverName: 'Sandra Williams',
+      caregiverName: 'Ana Smith',
       visitDate: atTime(now, 9, 0).toISOString().split('T')[0],
       visitType: 'Personal Care',
       status: 'pending_review',
@@ -900,8 +904,9 @@ export async function seedDemoData(connection: Connection) {
     {
       agencyId,
       visitId: new Types.ObjectId(),
+      caregiverId: caregiver2User._id,
       clientName: 'Robert Chen',
-      caregiverName: 'James Thompson',
+      caregiverName: 'Joseph Lee',
       visitDate: daysAgo(now, 2, 0, 0).toISOString().split('T')[0],
       visitType: 'Skilled Nursing',
       status: 'approved',
@@ -915,8 +920,9 @@ export async function seedDemoData(connection: Connection) {
     {
       agencyId,
       visitId: new Types.ObjectId(),
+      caregiverId: caregiver1User._id,
       clientName: 'Dorothy Williams',
-      caregiverName: 'Maria Garcia',
+      caregiverName: 'Ana Smith',
       visitDate: daysAgo(now, 3, 0, 0).toISOString().split('T')[0],
       visitType: 'Medication Management',
       status: 'needs_clarification',

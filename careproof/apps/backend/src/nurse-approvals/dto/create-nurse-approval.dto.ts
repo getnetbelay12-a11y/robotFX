@@ -4,6 +4,10 @@ export class CreateNurseApprovalDto {
   @IsMongoId()
   visitId!: string;
 
+  @IsMongoId()
+  @IsOptional()
+  caregiverId?: string;
+
   @IsString()
   clientName!: string;
 
