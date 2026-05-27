@@ -27,11 +27,9 @@ import {
   expirationRecords,
   inspectionFindings,
   inspectionRules,
-  intakeRecords,
   medicalAvailabilityRecords,
   nurseApprovals,
   socialWorkCases,
-  users,
 } from '../data/demoCareProofData';
 import {
   buildVisitExceptionItems,
@@ -73,14 +71,6 @@ import {
   checkOutCanonicalDemoVisitApi,
   cleanupCaregiverNoteApi,
   completeCanonicalDemoTaskApi,
-  decideNurseApprovalApi,
-  fetchExpirationRecordsApi,
-  fetchInspectionFindingsApi,
-  fetchInspectionRulesApi,
-  fetchIntakeRecordsApi,
-  fetchMedicalAvailabilityApi,
-  fetchNurseApprovalsApi,
-  fetchSocialWorkCasesApi,
   generateFamilyUpdateDraftApi,
   generateIncidentTriageApi,
   generateNextActionsApi,
@@ -91,11 +81,6 @@ import {
   loadCanonicalDemoVisitApi,
   saveCanonicalDemoVisitNoteApi,
   skipCanonicalDemoTaskApi,
-  updateFindingStatusApi,
-  updateIntakeStageApi,
-  updateMedicalAvailabilityStatusApi,
-  updateRenewalStatusApi,
-  updateSocialWorkCaseStatusApi,
   generateVisitSummaryApi,
   generateWeeklyReportDraftApi,
   type GoLiveChecklistPayload,
@@ -103,22 +88,11 @@ import {
   type SystemStatusPayload,
 } from '../lib/api-client';
 import {
-  AuditTimeline,
-  ApprovalBadge,
-  DetailDrawer,
-  MetricCard,
-  ModuleDashboard,
-  NextActionPanel,
-  PageHeader,
-  RiskBadge,
-} from './ui';
-import {
   buildDataExportCsv,
   buildFallbackGoLiveChecklist,
   buildFallbackIntegrations,
   buildFallbackSystemStatus,
 } from '../lib/deployment-readiness';
-import { isDateStringToday } from '../lib/date-utils';
 import type {
   CarePlanTaskDefinition,
   ExceptionItem,
@@ -4854,290 +4828,13 @@ export { InspectionCenterScreen } from './operational/inspection-center-screen';
 
 export { SocialWorkScreen } from './operational/social-work-screen';
 
-export function IntakeAgentsScreen() {
-  const [records, setRecords] = useState(intakeRecords);
-  const [backendConnected, setBackendConnected] = useState(false);
-  const [stageOverrides, setStageOverrides] = useState<Record<string, string>>({});
-  const NEXT_BACKEND_STAGE: Record<string, string> = {
-    'New Referral': 'assessment',
-    'Assessment Scheduled': 'authorization',
-    'Nurse Approval Required': 'onboarding',
-    'Ready for Scheduling': 'active',
-  };
-  const visibleStage = (item: typeof records[number]) => stageOverrides[item.id] ?? item.stage;
-  const stageCounts = records.reduce<Record<string, number>>((acc, item) => {
-    const stage = visibleStage(item);
-    acc[stage] = (acc[stage] ?? 0) + 1;
-    return acc;
-  }, {});
-  const activeStages = Object.entries(stageCounts);
+export { IntakeAgentsScreen } from './operational/intake-agents-screen';
 
-  useEffect(() => {
-    fetchIntakeRecordsApi().then((data) => {
-      if (data.length > 0) {
-        setRecords(data);
-        setBackendConnected(true);
-      }
-    }).catch(() => {});
-  }, []);
+export { MedicalAvailabilityScreen } from './operational/medical-availability-screen';
 
-  return (
-    <AppShell title="Intake / agents" subtitle="Track referrals from first contact through documents, assessment, nurse approval, and ready-for-scheduling handoff." navItems={consoleLinks}>
-      {backendConnected && (
-        <div className="mb-4 px-4 py-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">Live backend connected · {records.length} records</div>
-      )}
-      <div className="statsGrid">
-        <StatCard label="New referrals" value={stageCounts['New Referral'] ?? 0} tone="info" />
-        <StatCard label="Waiting documents" value={stageCounts['Documents Pending'] ?? 0} tone="warning" />
-        <StatCard label="Needs nurse approval" value={stageCounts['Nurse Approval Required'] ?? 0} tone="danger" />
-        <StatCard label="Ready for scheduling" value={stageCounts['Ready for Scheduling'] ?? 0} tone="positive" />
-        <StatCard label="Conversion rate" value="68%" tone="info" />
-      </div>
-      <DashboardCard title="Pipeline board">
-        <div className="kanbanGrid">
-          {activeStages.map(([stage]) => (
-            <div key={stage} className="kanbanColumn kanbanColumn-neutral">
-              <div className="kanbanHeader"><strong>{stage}</strong><span className="kanbanBadge">{stageCounts[stage]}</span></div>
-              {records.filter((item) => visibleStage(item) === stage).map((item) => {
-                const nextStage = NEXT_BACKEND_STAGE[stage];
-                return (
-                  <div key={item.id} className="visitCard">
-                    <div className="visitCardTop"><strong>{item.prospectName}</strong><StatusBadge status={item.priority} /></div>
-                    <p>{item.requiredServices.join(', ')}</p>
-                    <p><strong>Next:</strong> {item.nextAction}</p>
-                    {nextStage && (
-                      <button
-                        type="button"
-                        className="textAction"
-                        onClick={async () => {
-                          const nextDisplay = Object.entries(NEXT_BACKEND_STAGE).find(([, value]) => value === nextStage)?.[0];
-                          if (nextDisplay) setStageOverrides((current) => ({ ...current, [item.id]: nextDisplay }));
-                          try {
-                            const updated = await updateIntakeStageApi(item.id, nextStage);
-                            setRecords((previous) => previous.map((record) => record.id === updated.id ? updated : record));
-                            setStageOverrides((current) => {
-                              const next = { ...current };
-                              delete next[updated.id];
-                              return next;
-                            });
-                          } catch {
-                            setStageOverrides((current) => {
-                              const next = { ...current };
-                              delete next[item.id];
-                              return next;
-                            });
-                          }
-                        }}
-                      >
-                        Advance
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      </DashboardCard>
-      <DashboardCard title="Intake records">
-        <DataTable
-          columns={['Prospect', 'Referral source', 'Agent', 'Branch', 'Payer', 'Documents', 'Nurse approval', 'Next action']}
-          rows={records.map((item) => [
-            item.prospectName,
-            item.referralSource,
-            users.find((user) => user.id === item.assignedAgentId)?.name ?? item.assignedAgentId ?? 'Agent',
-            getBranch(item.branchId)?.name ?? '-',
-            item.payerType,
-            <StatusBadge key="docs" status={item.documentsStatus} />,
-            <StatusBadge key="nurse" status={item.nurseApprovalStatus} />,
-            item.nextAction,
-          ])}
-        />
-      </DashboardCard>
-    </AppShell>
-  );
-}
+export { ExpirationCenterScreen } from './operational/expiration-center-screen';
 
-export function MedicalAvailabilityScreen() {
-  const [medRecords, setMedRecords] = useState(medicalAvailabilityRecords);
-  const [backendConnected, setBackendConnected] = useState(false);
-  const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
-  const visibleStatus = (item: typeof medRecords[number]) => statusOverrides[item.id] ?? item.status;
-  const blocked = medRecords.filter((item) => item.blocksVisit).length;
-  const missing = medRecords.filter((item) => ['Missing', 'Expired'].includes(visibleStatus(item))).length;
-  const needsConfirmation = medRecords.filter((item) => visibleStatus(item) === 'Needs Confirmation').length;
-
-  useEffect(() => {
-    fetchMedicalAvailabilityApi().then((data) => {
-      if (data.length > 0) {
-        setMedRecords(data);
-        setBackendConnected(true);
-      }
-    }).catch(() => {});
-  }, []);
-
-  return (
-    <AppShell title="Medical availability" subtitle="Confirm staff, supplies, medication, equipment, transportation, backup coverage, and emergency contacts before visits are treated as ready." navItems={consoleLinks}>
-      {backendConnected && (
-        <div className="mb-4 px-4 py-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">Live backend connected · {medRecords.length} records</div>
-      )}
-      <div className="statsGrid">
-        <StatCard label="Visits blocked" value={blocked} tone={blocked ? 'danger' : 'positive'} />
-        <StatCard label="Missing availability" value={missing} tone={missing ? 'danger' : 'neutral'} />
-        <StatCard label="Needs confirmation" value={needsConfirmation} tone={needsConfirmation ? 'warning' : 'neutral'} />
-        <StatCard label="Staff coverage gaps" value={medRecords.filter((item) => item.type.includes('availability') || item.type === 'Backup caregiver').length} tone="info" />
-      </div>
-      <DataTable
-        columns={['Client / Visit', 'Availability type', 'Status', 'Owner', 'Detail', 'Next action', 'Blocks visit', 'Actions']}
-        rows={medRecords.map((item) => [
-          item.clientName ?? (item.clientId ? getClient(item.clientId)?.name : null) ?? 'Agency',
-          item.type,
-          <StatusBadge key="status" status={visibleStatus(item)} />,
-          item.owner,
-          item.detail,
-          item.nextAction,
-          item.blocksVisit ? <StatusBadge key="blocker" status="Blocker" /> : <StatusBadge key="available" status="Available" />,
-          <div key="actions" className="inlineActions">
-            <button
-              type="button"
-              className="textAction"
-              onClick={async () => {
-                setStatusOverrides((current) => ({ ...current, [item.id]: 'Available' }));
-                try {
-                  const updated = await updateMedicalAvailabilityStatusApi(item.id, 'confirmed');
-                  setMedRecords((previous) => previous.map((record) => record.id === updated.id ? updated : record));
-                  setStatusOverrides((current) => {
-                    const next = { ...current };
-                    delete next[updated.id];
-                    return next;
-                  });
-                } catch {
-                  setStatusOverrides((current) => {
-                    const next = { ...current };
-                    delete next[item.id];
-                    return next;
-                  });
-                }
-              }}
-            >
-              Confirm
-            </button>
-          </div>,
-        ])}
-      />
-    </AppShell>
-  );
-}
-
-export function ExpirationCenterScreen() {
-  const { showToast } = useDemoStore();
-  const [expRecords, setExpRecords] = useState(expirationRecords);
-  const [backendConnected, setBackendConnected] = useState(false);
-  const expiring30 = expRecords.filter((item) => item.state === 'Expiring in 30 days').length;
-  const expiring7 = expRecords.filter((item) => item.state === 'Expiring in 7 days').length;
-  const blockers = expRecords.filter((item) => item.blocksVisits || ['Expired', 'Missing', 'Blocker'].includes(item.state)).length;
-
-  useEffect(() => {
-    fetchExpirationRecordsApi().then((data) => {
-      if (data.length > 0) {
-        setExpRecords(data);
-        setBackendConnected(true);
-      }
-    }).catch(() => {});
-  }, []);
-
-  return (
-    <AppShell title="Expiration center" subtitle="Track licenses, checks, certifications, care plans, authorizations, consents, agency reviews, and blockers before they disrupt care." navItems={consoleLinks}>
-      {backendConnected && (
-        <div className="mb-4 px-4 py-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">Live backend connected · {expRecords.length} records</div>
-      )}
-      <div className="statsGrid">
-        <StatCard label="Expiring in 30 days" value={expiring30} tone={expiring30 ? 'warning' : 'neutral'} />
-        <StatCard label="Expiring in 7 days" value={expiring7} tone={expiring7 ? 'danger' : 'neutral'} />
-        <StatCard label="Expired / missing blockers" value={blockers} tone={blockers ? 'danger' : 'positive'} />
-        <StatCard label="Visits blocked" value={expRecords.filter((item) => item.blocksVisits).length} tone="danger" />
-      </div>
-      <DataTable
-        columns={['Owner', 'Category', 'Item', 'Expiration', 'State', 'Responsible owner', 'Renewal status', 'Actions']}
-        rows={expRecords.map((item) => [
-          item.ownerName,
-          item.category,
-          item.item,
-          item.expirationDate ?? 'Missing',
-          <StatusBadge key="state" status={item.state} />,
-          item.responsibleOwner,
-          item.renewalStatus,
-          <div key="actions" className="inlineActions">
-            <button type="button" className="textAction" onClick={async () => { showToast('Renewal action recorded.'); try { const u = await updateRenewalStatusApi(item.id, 'renewed'); setExpRecords((p) => p.map((r) => r.id === u.id ? u : r)); } catch {} }}>Renewal action</button>
-            <button type="button" className="textAction" onClick={() => showToast('Notification draft generated. Human confirmation required before sending.')}>Notify staff</button>
-          </div>,
-        ])}
-      />
-      <DashboardCard title="Notification drafts">
-        <div className="stackGrid">
-          {expRecords.filter((item) => item.state !== 'Valid').map((item) => (
-            <div key={item.id} className="miniSummaryCard">
-              <div className="aiRiskSignalTop"><strong>{item.item}</strong><StatusBadge status={item.state} /></div>
-              <p>{item.notificationDraft}</p>
-              <AiDisclaimer>Notification draft generated. Human confirmation required before external send.</AiDisclaimer>
-            </div>
-          ))}
-        </div>
-      </DashboardCard>
-    </AppShell>
-  );
-}
-
-export function SystemReadinessScreen() {
-  const hardcodedReadiness = [
-    ['Authentication hardening', 'Production Blocker', 'Demo role switching exists; production auth/session hardening remains.'],
-    ['RBAC / agency isolation', 'Needs Configuration', 'Demo-safe scope exists; production verification still required.'],
-    ['Database backups', 'Needs Configuration', 'Mongo backup scripts exist; automated backup policy is not deployed.'],
-    ['Monitoring', 'Needs Configuration', 'Health/ready endpoints exist; external monitoring provider is not configured.'],
-    ['Audit logging', 'Pilot Ready', 'Core visit, AI, setup, and workflow events have audit patterns.'],
-    ['Email/SMS provider setup', 'Needs Configuration', 'Demo notification drafts only. No real sends in local demo.'],
-    ['Privacy/compliance review', 'Production Blocker', 'Family visibility rules are demo-tested; formal review remains.'],
-    ['Deployment environment', 'Demo Ready', 'Local stack and build checks pass for demo.'],
-  ];
-  const [readiness, setReadiness] = useState(hardcodedReadiness);
-
-  useEffect(() => {
-    getSystemStatusApi().then((payload) => {
-      const rows: string[][] = [
-        ['API status', payload.status === 'ok' ? 'Demo Ready' : 'Needs Configuration', `API is ${payload.status}. Environment: ${payload.environment}.`],
-        ['Database', payload.database?.status === 'connected' ? 'Demo Ready' : 'Needs Configuration', `Database ${payload.database?.status ?? 'unknown'}${payload.database?.engine ? ` (${payload.database.engine})` : ''}.`],
-        ['Email provider', payload.notificationProviders?.email === 'none' ? 'Needs Configuration' : 'Pilot Ready', `Email provider: ${payload.notificationProviders?.email ?? 'not configured'}.`],
-        ['SMS provider', payload.notificationProviders?.sms === 'none' ? 'Needs Configuration' : 'Pilot Ready', `SMS provider: ${payload.notificationProviders?.sms ?? 'not configured'}.`],
-        ['AI mode', payload.ai?.mode ? 'Pilot Ready' : 'Needs Configuration', `AI mode: ${payload.ai?.mode ?? 'unknown'}${payload.ai?.provider ? ` via ${payload.ai.provider}` : ''}.`],
-        ['Storage', payload.storage?.type ? 'Demo Ready' : 'Needs Configuration', `Storage: ${payload.storage?.type ?? 'unknown'}${payload.storage?.seedProtection ? ` · seed protection: ${payload.storage.seedProtection}` : ''}.`],
-        ['Demo mode', payload.demoMode ? 'Demo Ready' : 'Pilot Ready', `Demo mode is ${payload.demoMode ? 'enabled' : 'disabled'}.`],
-      ];
-      if (payload.warnings?.length) {
-        rows.push(['Warnings', 'Needs Configuration', payload.warnings.join(' ')]);
-      }
-      setReadiness(rows);
-    }).catch(() => {});
-  }, []);
-
-  return (
-    <AppShell title="System readiness" subtitle="A blunt go-live view. Demo-ready does not mean production-ready." navItems={consoleLinks}>
-      <div className="statsGrid">
-        <StatCard label="Demo ready" value={readiness.filter((item) => item[1] === 'Demo Ready').length} tone="positive" />
-        <StatCard label="Pilot ready" value={readiness.filter((item) => item[1] === 'Pilot Ready').length} tone="info" />
-        <StatCard label="Needs configuration" value={readiness.filter((item) => item[1] === 'Needs Configuration').length} tone="warning" />
-        <StatCard label="Production blockers" value={readiness.filter((item) => item[1] === 'Production Blocker').length} tone="danger" />
-      </div>
-      <DataTable
-        columns={['Area', 'State', 'Reality']}
-        rows={readiness.map(([area, state, reality]) => [
-          area,
-          <StatusBadge key="state" status={state} />,
-          reality,
-        ])}
-      />
-    </AppShell>
-  );
-}
+export { SystemReadinessScreen } from './operational/system-readiness-screen';
 
 export function QualityRulesScreen() {
   const { settings, updateAgencySettings } = useDemoStore();
